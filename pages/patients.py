@@ -3,6 +3,7 @@ import pandas as pd
 import streamlit as st
 
 from portal import data, plots
+from portal.age_association import age_association
 from portal.drug_biomarkers import drug_biomarkers
 from portal.feature_query import patient_feature_query
 from portal.survival_view import patient_survival
@@ -11,8 +12,8 @@ st.title("Patients")
 st.markdown("AML patient cohorts, adult and pediatric, with RNA expression, mutations, clinical "
             "information and drug response measured on patient cells in the lab.")
 
-tab_overview, tab_fq, tab_drug, tab_surv = st.tabs(
-    ["Cohorts", "Feature query", "Drug response", "Survival"])
+tab_overview, tab_fq, tab_drug, tab_age, tab_surv = st.tabs(
+    ["Cohorts", "Feature query", "Drug response", "Age association", "Survival"])
 
 with tab_overview:
     names = data.patient_cohort_names()
@@ -162,6 +163,9 @@ with tab_fq:
 with tab_drug:
     st.caption("Built-in analysis 1 · Drug response")
     drug_biomarkers()
+
+with tab_age:
+    age_association()
 
 with tab_surv:
     patient_survival()

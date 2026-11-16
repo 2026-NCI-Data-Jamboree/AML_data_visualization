@@ -30,7 +30,7 @@ thing everywhere in the portal.
 | page | what you can do |
 |---|---|
 | Cell lines | see which data each line has; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
-| Patients | see what each cohort contains; look up a gene in every cohort; find genes linked to drug response; compare survival between groups |
+| Patients | see what each cohort contains; look up a gene in every cohort; find genes linked to drug response or to age; compare survival between groups |
 | Deconvolution | planned |
 | Downloads | download every processed file |
 """
@@ -110,6 +110,12 @@ with tab_methods:
   cohorts are then combined, giving larger cohorts more weight (Fisher's z with Stouffer's method,
   weighted by sample size), and adjusted for the number of genes tested (FDR). *Cohorts agree* means the
   link has the same direction in every cohort.
+- **Age association** (Patients): every gene's expression (or response to every drug) is related to age
+  at diagnosis, one sample per patient, either as **continuous age** (Spearman correlation with age in
+  years; at least 10 patients) or between two **age groups** (e.g. AYA vs adult; a rank comparison of the
+  two groups, at least 3 patients in each). Cohorts are combined as in the drug response analysis.
+  Positive = higher in older patients, or in group A (for drugs: more sensitive). The pediatric cohort
+  adds the youngest patients; it has no adults, so it is not used when the comparison needs them.
 - **Survival** (Patients): Kaplan–Meier curves with 95% confidence bands, compared with the log-rank
   test. The hazard ratio compares the first group with the second (above 1 = worse outcome in the first
   group). Each patient counts once, using the diagnosis sample when there is one. Overall survival is

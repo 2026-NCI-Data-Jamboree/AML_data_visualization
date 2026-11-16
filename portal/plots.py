@@ -209,7 +209,8 @@ def kaplan_meier(curves: dict[str, pd.DataFrame], colors: dict[str, str], x_titl
     return fig
 
 
-def meta_volcano(df: pd.DataFrame, x_title: str, fdr: float = 0.05, n_label: int = 12) -> go.Figure:
+def meta_volcano(df: pd.DataFrame, x_title: str, fdr: float = 0.05, n_label: int = 12,
+                 pos: str = "sensitivity", neg: str = "resistance") -> go.Figure:
     """df: gene, r (pooled), p, fdr, concordant (bool). Positive r = associated with sensitivity.
     customdata = gene, so a Streamlit selection returns the genes picked."""
     d = df[np.isfinite(df["p"])].copy()
@@ -218,7 +219,7 @@ def meta_volcano(df: pd.DataFrame, x_title: str, fdr: float = 0.05, n_label: int
     d["cls"] = np.where(sig & d["concordant"], np.where(d["r"] > 0, "S", "R"),
                         np.where(sig, "mixed", "ns"))
     style = {"ns": (COL_NS, "n.s."), "mixed": ("#eda100", f"FDR < {fdr}, cohorts disagree"),
-             "R": (COL_B, f"resistance, FDR < {fdr}"), "S": (COL_A, f"sensitivity, FDR < {fdr}")}
+             "R": (COL_B, f"{neg}, FDR < {fdr}"), "S": (COL_A, f"{pos}, FDR < {fdr}")}
     fig = go.Figure()
     for cls, (col, name) in style.items():
         s = d[d["cls"] == cls]
@@ -244,11 +245,20 @@ def meta_volcano(df: pd.DataFrame, x_title: str, fdr: float = 0.05, n_label: int
 
 
 def assoc_scatter(df: pd.DataFrame, x_title: str, y_title: str, title: str = "",
-                  color: str = COL_A) -> go.Figure:
-    """One point per sample (columns sample_id, x, y) with a least-squares line."""
-    fig = go.Figure(go.Scatter(x=df["x"], y=df["y"], mode="markers", text=df["sample_id"],
-                               marker=dict(color=color, size=6, opacity=0.75),
-                               hovertemplate="%{text}<br>x %{x:.3f}<br>y %{y:.3f}<extra></extra>"))
+                  color: str = COL_A, group_colors: dict | None = None) -> go.Figure:
+    """One point per sample (columns sample_id, x, y; optional group) with a least-squares line."""
+    fig = go.Figure()
+    if group_colors and "group" in df:
+        for g, col in group_colors.items():
+            s = df[df["group"] == g]
+            if len(s):
+                fig.add_trace(go.Scatter(x=s["x"], y=s["y"], mode="markers", text=s["sample_id"], name=g,
+                                         marker=dict(color=col, size=6, opacity=0.8),
+                                         hovertemplate="%{text}<br>x %{x:.3f}<br>y %{y:.3f}<extra></extra>"))
+    else:
+        fig.add_trace(go.Scatter(x=df["x"], y=df["y"], mode="markers", text=df["sample_id"],
+                                 marker=dict(color=color, size=6, opacity=0.75),
+                                 hovertemplate="%{text}<br>x %{x:.3f}<br>y %{y:.3f}<extra></extra>"))
     ok = df[["x", "y"]].dropna()
     if len(ok) >= 3 and ok["x"].std() > 0:
         b, a = np.polyfit(ok["x"], ok["y"], 1)

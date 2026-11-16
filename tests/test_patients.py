@@ -123,3 +123,47 @@ def test_age_groups_nci_bands():
     g = age_groups(pd.Series([0.5, 14.9, 15, 39.9, 40, np.nan]))
     assert g.tolist() == ["pediatric (<15)", "pediatric (<15)", "AYA (15-39)", "AYA (15-39)",
                           "adult (≥40)", "age unknown"]
+
+
+@needs_patients
+def test_age_association_tab():
+    at = AppTest.from_file(str(ROOT / "pages/patients.py"), default_timeout=300).run()
+    assert not at.exception, at.exception
+    t = [d.value for d in at.dataframe if "concordant" in d.value.columns and "gene" in d.value.columns][-1]
+    lrrn3 = t.set_index("gene").loc["LRRN3"]                    # known to fall with age in blood
+    assert lrrn3["r"] < 0 and lrrn3["fdr"] < 1e-6
+    show = [m for m in at.multiselect if m.label == "Show genes"][0]
+    assert show.value == ["LRRN3"]                                     # top hit by default
+    show.set_value(["MYH11", "HOXA9"]).run()
+    assert not at.exception, at.exception
+    assert any(m.value.startswith("**HOXA9**") for m in at.markdown)
+    at.radio(key="age_what").set_value("Drug response").run()
+    assert not at.exception, at.exception
+    [m for m in at.multiselect if m.label == "Show drugs"][0].set_value(["Venetoclax"]).run()
+    assert any(m.value.startswith("**Venetoclax**") for m in at.markdown)
+    at.multiselect(key="age_cohorts").set_value(["BEAT_AML", "WANG_2022_PED"]).run()
+    assert not at.exception, at.exception
+    at.radio(key="age_what").set_value("Gene expression").run()
+    at.text_input(key="age_filter").set_value("HOXA").run()
+    assert not at.exception, at.exception
+    at.multiselect(key="age_cohorts").set_value(["BEAT_AML", "LEE_2018", "MALANI_2022", "WANG_2022_PED"]).run()
+    at.radio(key="age_how").set_value("Age groups").run()
+    assert not at.exception, at.exception
+    note = [c.value for c in at.caption if c.value.startswith("Cohorts compared")][0]
+    assert "Not used" in note and "Pediatric AML pharmacogenomics." in note   # no adults >= 40 for AYA vs adult
+    assert not any("median age" in d.value.columns for d in at.dataframe)
+    for ga, gb in [("pediatric (<15)", "all other ages"), ("pediatric (<15)", "AYA (15-39)"),
+                   ("adult (≥40)", "pediatric (<15)")]:
+        at.selectbox(key="age_ga").set_value(ga).run()
+        at.selectbox(key="age_gb").set_value(gb).run()
+        assert not at.exception, (ga, gb, at.exception)
+    at.radio(key="age_what").set_value("Drug response").run()
+    assert not at.exception, at.exception
+
+
+def test_age_group_target_is_binary():
+    from portal.age_association import OTHERS, _target
+    if not (PATIENTS / "BEAT_AML").is_dir():
+        pytest.skip("results/patients not prepared")
+    y = _target("BEAT_AML", ("groups", "pediatric (<15)", OTHERS))
+    assert set(y.unique()) <= {0.0, 1.0} and y.eq(1).sum() >= 3 and y.eq(0).sum() > 100
