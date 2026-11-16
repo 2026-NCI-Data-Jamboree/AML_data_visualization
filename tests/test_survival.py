@@ -94,7 +94,7 @@ def test_survival_tab_placeholder_without_patients(tmp_path, monkeypatch):
 def test_survival_tab_on_synthetic_cohort(synthetic_results):
     at = AppTest.from_file(str(ROOT / "pages/patients.py"), default_timeout=120).run()
     assert not at.exception, at.exception
-    assert at.radio(key="surv_by").options == ["Mutation", "Gene of interest", "Clinical"]
+    assert at.radio(key="surv_by").options == ["Mutation", "Gene expression", "Clinical"]
     muts = at.selectbox(key="surv_mut").options
     assert any(o.startswith("TP53 (") for o in muts) and any(o.startswith("FLT3 (") for o in muts), muts
     at.selectbox(key="surv_mut").set_value("mut:TP53").run()
@@ -104,7 +104,7 @@ def test_survival_tab_on_synthetic_cohort(synthetic_results):
     for key in ["risk_group", "KMT2A_rearranged"]:
         at.selectbox(key="surv_clin").set_value(key).run()
         assert not at.exception, (key, at.exception)
-    at.radio(key="surv_by").set_value("Gene of interest").run()
+    at.radio(key="surv_by").set_value("Gene expression").run()
     at.selectbox(key="surv_gene").set_value("MAP1A").run()
     p = {m.label: m.value for m in at.metric}["Log-rank p"]
     assert float(p) < 0.05                                       # MAP1A drives hazard in the fixture

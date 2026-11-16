@@ -52,7 +52,7 @@ def _patients(cohort: str, t_col: str, e_col: str) -> pd.DataFrame:
 
 def _grouping_options(cohort: str, s: pd.DataFrame) -> dict[str, dict[str, str]]:
     """category -> {option key: label}. Mutation: genes with >= MIN_MUTANT mutant patients here (most
-    frequent first); Gene of interest: high vs low expression; Clinical: annotation columns.
+    frequent first); Gene expression: high vs low expression of a chosen gene; Clinical: annotation columns.
     The MYC / mTOR RNA signature groupings are not offered for survival."""
     g = data.patient_groupings(cohort)
     muts = {}
@@ -77,7 +77,7 @@ def _grouping_options(cohort: str, s: pd.DataFrame) -> dict[str, dict[str, str]]
     if muts:
         opts["Mutation"] = {k: v[1] for k, v in sorted(muts.items(), key=lambda kv: -kv[1][0])}
     if _expression_layers(cohort):
-        opts["Gene of interest"] = {EXPRESSION: EXPRESSION}
+        opts["Gene expression"] = {EXPRESSION: EXPRESSION}
     if clin:
         opts["Clinical"] = clin
     return opts
@@ -105,8 +105,8 @@ def _groups(cohort: str, s: pd.DataFrame, key: str, kp: str) -> tuple[pd.Series,
         sym = f["gene_symbol"] if "gene_symbol" in f else f.index.to_series()
         sym = sym.where(sym != "", f["label"])
         genes = sorted(sym.dropna().unique())
-        gene = c2.selectbox("Gene of interest", genes, key=f"{kp}_gene",
-                            index=genes.index("MAP1A") if "MAP1A" in genes else 0)
+        gene = c2.selectbox("Gene", genes, key=f"{kp}_gene",
+                            index=genes.index("PEAR1") if "PEAR1" in genes else 0)
         split = c3.selectbox("Split patients at", list(SPLITS), key=f"{kp}_split")
         V = data.patient_values(cohort, layer)
         feats = [x for x in sym.index[sym == gene] if x in V.index]
