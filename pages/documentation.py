@@ -30,7 +30,7 @@ thing everywhere in the portal.
 | page | what you can do |
 |---|---|
 | Cell lines | see which data each line has; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
-| Patients | see what each cohort contains; look up a gene in every cohort; find genes linked to drug response or to age; compare survival between groups |
+| Patients | see what each cohort contains; look up a gene's expression in every cohort; find genes linked to drug response or to age; compare survival between groups |
 | Deconvolution | planned |
 | Downloads | download every processed file |
 """

@@ -75,6 +75,7 @@ def cell_line_feature_query(key_prefix: str = "fq") -> None:
 
 def patient_feature_query(kp: str = "pfq") -> None:
     idx = data.patient_gene_index()
+    idx = idx[idx["via"] == "feature"]                 # molecular data only, no drug response
     if idx.empty:
         st.info("No patient cohorts are available yet.")
         return
@@ -84,8 +85,9 @@ def patient_feature_query(kp: str = "pfq") -> None:
     glabels = {}
     for c in names:
         for col, r in data.patient_groupings(c).iterrows():
-            glabels.setdefault(col, r["label"])
-    st.markdown("Look up one gene in every patient cohort: its expression, and response to drugs that target it.")
+            if col not in ("MYC_high", "mTOR_high", "MYC_mTOR_category", "cell_state"):   # not offered here
+                glabels.setdefault(col, r["label"])
+    st.markdown("Look up one gene in every patient cohort.")
     c1, c2 = st.columns([2, 3])
     gene = c1.selectbox("Gene (HGNC symbol)", genes, key=f"{kp}_gene",
                         index=genes.index("MAP1A") if "MAP1A" in genes else 0)
@@ -145,12 +147,6 @@ def patient_feature_query(kp: str = "pfq") -> None:
                     row["p (Welch)"] = r["p_welch"].iloc[0] if len(r) else np.nan
                 summary.append(row)
             st.caption(f"{meta['unit']} · {meta['source']}" + (" · lower = more sensitive" if lower else ""))
-    with top:
-        if not summary:
+    if not summary:
+        with top:
             st.info("No measurements for this gene in the patient cohorts.")
-            return
-        st.subheader("Summary" + (f" by {glabels[grouping]}" if grouping is not None else ""))
-        st.dataframe(pd.DataFrame(summary), hide_index=True, width="stretch",
-                     column_config={"p (Welch)": st.column_config.NumberColumn(format="%.2e")})
-        st.caption("p values are per feature and not corrected for multiple testing; "
-                   "Welch p is shown when the grouping has exactly two groups.")

@@ -81,7 +81,10 @@ def test_patient_feature_query_and_cohorts_tabs():
     for gene in ["BCL2", "FLT3", "TP53"]:
         at.selectbox(key="pfq_gene").set_value(gene).run()
         assert not at.exception, (gene, at.exception)
-    for grouping in ["mut_TP53", "KMT2A_rearranged", "mTOR_high", "timepoint"]:
+    assert not {"MYC RNA signature", "mTOR RNA signature", "MYC x mTOR RNA category",
+                "Cell state (Primitive / Committed)"} & set(
+        at.selectbox(key="pfq_grouping").options)
+    for grouping in ["mut_TP53", "KMT2A_rearranged", "risk_group", "timepoint"]:
         at.selectbox(key="pfq_grouping").set_value(grouping).run()
         assert not at.exception, (grouping, at.exception)
     from portal import data
