@@ -2,11 +2,13 @@ import streamlit as st
 
 from portal import data
 
-st.title("AML Multi-Omics Portal")
+st.title("Building a Harmonized Multi-Omics Data Resource and Web Application for Biomarker Discovery "
+         "and Drug Target Nomination in Leukemia")
+st.caption("A 2026 NCI Data Jamboree project")
 st.markdown(
     "A harmonized multi-omics resource for **biomarker discovery and drug-target nomination in "
     "leukemia**, with acute myeloid leukemia (AML) as the first use case. It brings together "
-    "public patient cohorts (CPTAC, TCGA, TARGET, Beat AML, ...) and cell-line resources "
+    "public patient cohorts (CPTAC, Beat AML, ...) and cell-line resources "
     "(DepMap, CCLE) under one annotation schema (OncoTree / NCI Thesaurus, HGNC)."
 )
 
@@ -15,12 +17,11 @@ dsets = data.datasets()
 cl = data.cell_lines()
 
 pt = data.patient_cohort_names()
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3 = st.columns(3)
 c1.metric("Datasets in catalog", len(cat))
-c2.metric("Processed", int((cat["status"] == "processed").sum()))
-c3.metric("AML cell lines", len(cl))
-c4.metric("Patients", f"{len(set().union(*[set(data.patient_samples(c)['participant_id'].astype(str)) for c in pt])):,}",
+c2.metric("Patients", f"{len(set().union(*[set(data.patient_samples(c)['participant_id'].astype(str)) for c in pt])):,}",
           help=f"{len(pt)} cohorts: " + ", ".join(pt.values()))
+c3.metric("AML cell lines", len(cl))
 
 st.subheader("What you can do")
 st.markdown(

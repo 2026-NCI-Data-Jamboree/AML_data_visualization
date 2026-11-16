@@ -18,7 +18,7 @@ cl = data.cell_lines()
 dsets = data.datasets().set_index("key")
 GROUPINGS = data.grouping_labels()
 
-tab_lines, tab_fq, tab_cmp, tab_dep = st.tabs(["Cell lines", "Feature query", "Compare groups", "Gene dependency"])
+tab_lines, tab_fq, tab_cmp, tab_dep = st.tabs(["Overview", "Feature query", "Compare groups", "Gene dependency"])
 
 with tab_lines:
     G = data.groupings()
@@ -63,11 +63,9 @@ with tab_lines:
     st.markdown("<div style='font-size:0.85em;line-height:1.9'>" + "<br>".join(legend) + "</div>",
                 unsafe_allow_html=True)
 
-    st.subheader("Annotation")
-    show = ["cell_line", "participant_id", "disease_oncotree", "OncotreeSubtype", "population", "sex",
-            "age_years", "mutations", "KMT2A_rearranged", "KMT2A_partner", "MYC_high", "mTOR_high",
-            "MYC_mTOR_category", "MYC_score", "mTOR_score", "Mito_high"]
-    st.dataframe(cl[[c for c in show if c in cl]], hide_index=True, width="stretch")
+    st.download_button("Download cell-line annotation (TSV)", data.file_path("samples.tsv").read_bytes(),
+                       file_name="AML_cell_line_annotation.tsv", key="cl_annotation_dl",
+                       help="One row per cell line: IDs, disease, age, sex, mutations, KMT2A, MYC / mTOR groups, ...")
 
 with tab_fq:
     cell_line_feature_query()

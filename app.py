@@ -1,7 +1,7 @@
 """AML multi-omics portal. Run: streamlit run app.py"""
 import streamlit as st
 
-st.set_page_config(page_title="AML Multi-Omics Portal", page_icon="🧬", layout="wide")
+st.set_page_config(page_title="AML Multi-Omic Data Analysis Portal", page_icon="🧬", layout="wide")
 
 st.navigation([
     st.Page("pages/home.py", title="Home", icon="🏠", default=True),

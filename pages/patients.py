@@ -13,7 +13,7 @@ st.markdown("AML patient cohorts, adult and pediatric, with RNA expression, muta
             "information and drug response measured on patient cells in the lab.")
 
 tab_overview, tab_fq, tab_drug, tab_age, tab_surv = st.tabs(
-    ["Cohorts", "Feature query", "Drug response", "Age association", "Survival"])
+    ["Overview", "Feature query", "Drug response", "Age association", "Survival"])
 
 with tab_overview:
     names = data.patient_cohort_names()
