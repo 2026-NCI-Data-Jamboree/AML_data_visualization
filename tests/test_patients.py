@@ -193,6 +193,10 @@ def test_proteomics_cohorts():
     assert 0 < len(sites.value) <= 6 and all(v.startswith("STAT5A_") for v in sites.value)
     sites.set_value(["STAT5A_S128"]).run()                           # one chosen site
     assert not at.exception, at.exception
+    at.selectbox(key="pfq_grouping").set_value("mut_FLT3").run()
+    import json
+    titles = [json.loads(c.proto.spec).get("layout", {}).get("title", {}).get("text", "") for c in at.get("plotly_chart")]
+    assert any("STAT5A_S128" in t and "Welch p =" in t for t in titles), titles
     at.selectbox(key="pfq_type").set_value("expression").run()
     at.selectbox(key="db_layer").set_value("protein").run()
     assert not at.exception, at.exception

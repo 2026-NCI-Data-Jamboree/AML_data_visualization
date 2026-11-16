@@ -45,3 +45,17 @@ def test_values_and_features_agree():
         F = pd.read_csv(CL / "features" / f"{key}.tsv", sep="\t", index_col="feature")
         assert list(V.index) == list(F.index), key
         assert set(V.columns) <= set(samples["cell_line"]), key
+
+
+def test_group_test_matches_scipy():
+    import numpy as np
+    import pandas as pd
+    from scipy import stats as ss
+    from portal.stats import group_test
+    rng = np.random.default_rng(5)
+    df = pd.DataFrame({"v": rng.normal(size=40), "g": ["a"] * 15 + ["b"] * 15 + ["c"] * 8 + ["d"] * 2})
+    name, p = group_test(df, "v", "g", ["a", "b"])
+    assert name == "Welch" and p == ss.ttest_ind(df.v[:15], df.v[15:30], equal_var=False).pvalue
+    name, p = group_test(df, "v", "g", ["a", "b", "c", "d"])          # d (n=2) is dropped
+    assert name == "Kruskal–Wallis" and p == ss.kruskal(df.v[:15], df.v[15:30], df.v[30:38]).pvalue
+    assert np.isnan(group_test(df, "v", "g", ["a", "d"])[1])

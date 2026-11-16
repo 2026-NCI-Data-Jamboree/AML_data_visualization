@@ -113,3 +113,17 @@ def meta_correlation(per_cohort: dict[str, pd.DataFrame]) -> pd.DataFrame:
     out = out[out["n_cohorts"] > 0].copy()
     out["fdr"] = bh(out["p"].to_numpy())
     return out.sort_values("p").reset_index(drop=True)
+
+
+def group_test(df: pd.DataFrame, value: str, group: str, levels: list[str], min_n: int = 3) -> tuple[str, float]:
+    """Two groups: Welch t test; more: Kruskal-Wallis. Groups with < min_n values are dropped.
+    Returns (test name, p); p is NaN when fewer than two groups are left."""
+    vals = [df.loc[df[group] == lv, value].dropna().to_numpy(float) for lv in levels]
+    vals = [v for v in vals if len(v) >= min_n]
+    if len(vals) < 2:
+        return ("Welch" if len(levels) == 2 else "Kruskal–Wallis"), np.nan
+    if len(vals) == 2:
+        if np.var(vals[0]) + np.var(vals[1]) == 0:
+            return "Welch", np.nan
+        return "Welch", float(stats.ttest_ind(vals[0], vals[1], equal_var=False).pvalue)
+    return "Kruskal–Wallis", float(stats.kruskal(*vals).pvalue)

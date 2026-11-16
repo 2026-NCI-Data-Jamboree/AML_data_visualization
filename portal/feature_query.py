@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from portal import data, plots
-from portal.stats import welch
+from portal.stats import group_test, welch
 
 
 def cell_line_feature_query(key_prefix: str = "fq") -> None:
@@ -119,6 +119,9 @@ def patient_feature_query(kp: str = "pfq") -> None:
         if not sites:
             st.info("Pick at least one site.")
             return
+        st.caption("Each site is tested between the groups: Welch t test for two groups, Kruskal–Wallis for "
+                   "more (groups need at least 3 samples). p values are per site and not corrected for "
+                   "multiple testing.")
     summary = []
     top = st.container()               # summary table goes here, above the per-cohort plots
     for c in names:
@@ -160,6 +163,10 @@ def patient_feature_query(kp: str = "pfq") -> None:
                 long["group"] = long["cell_line"].map(grp).fillna("not annotated") if levels else "all samples"
                 via = hk.loc[hk["feature"] == f, "via"].iloc[0]
                 title = (f"{meta['label']}: " + labels.get(f, f) + (f" → {gene}" if via == "drug target" else ""))
+                if key == "phospho" and len(levels) >= 2:          # group test for each site
+                    test, p = group_test(long[long["group"].isin(levels)], "value", "group", levels)
+                    title += (f"<br><sup>{test} p = {p:.2g}</sup>" if np.isfinite(p) else
+                              "<br><sup>too few samples per group for a test</sup>")
                 cols[i % len(cols)].plotly_chart(
                     plots.strip(long, "value", "group", (levels + ["not annotated"]) if levels else ["all samples"],
                                 title=title, y_title=meta["unit"]),

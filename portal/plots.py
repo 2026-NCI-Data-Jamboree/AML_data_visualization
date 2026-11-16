@@ -62,7 +62,7 @@ def strip(df: pd.DataFrame, value_col: str, group_col: str, order: list[str],
             fillcolor="rgba(0,0,0,0)", text=s["cell_line"],
             hovertemplate="%{text}: %{y:.3f}<extra></extra>"))
     fig.update_layout(title=title, yaxis_title=y_title, showlegend=False, height=380,
-                      margin=dict(l=10, r=10, t=40 if title else 10, b=10))
+                      margin=dict(l=10, r=10, t=(60 if "<br>" in title else 40) if title else 10, b=10))
     return fig
 
 
