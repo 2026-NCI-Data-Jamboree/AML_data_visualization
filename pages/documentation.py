@@ -18,7 +18,7 @@ thing everywhere in the portal.
 
 **Built-in analyses**
 
-1. **Drug response** (Patients): which genes are linked to how patient cells respond to a drug, and
+1. **Drug response** (Highlights, and Patients → Drug response): which genes are linked to how patient cells respond to a drug, and
    does the link hold up across independent cohorts? Example: MAP1A and venetoclax.
 2. **Cell-line variability** (Cell lines): how much AML cell lines differ across data types, depending on
    how they are grouped (TP53 mutation, KMT2A rearrangement, MYC- or mTOR-high, ...).
@@ -29,8 +29,9 @@ thing everywhere in the portal.
 
 | page | what you can do |
 |---|---|
+| Highlights | genome-wide search for markers of drug response that replicate across patient cohorts |
 | Cell lines | see which data each line has; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
-| Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; find genes linked to drug response or to age; compare survival between groups |
+| Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; check one marker against one drug; find genes linked to age; compare survival between groups |
 | Deconvolution | planned |
 | Downloads | download every processed file |
 """
@@ -120,7 +121,7 @@ with tab_methods:
   separately in each screen.
 - **Feature query**: one gene across every data type, shown by group. p values there are per feature
   and not adjusted.
-- **Drug response** (Patients): in each cohort, every gene's RNA or protein level (or every phosphosite) is correlated with response to
+- **Drug response** (Patients: one marker and one drug; Highlights: every marker at once): in each cohort, the marker's RNA or protein level (or phosphosite) is correlated with response to
   the chosen drug (Spearman rank correlation, at least 10 samples). The sign is set so that a **positive
   value always means higher expression goes with more sensitivity**, whatever the cohort's measure. The
   cohorts are then combined, giving larger cohorts more weight (Fisher's z with Stouffer's method,

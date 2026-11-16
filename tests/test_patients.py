@@ -60,7 +60,7 @@ def test_patient_results_follow_contract():
 
 @needs_patients
 def test_drug_biomarkers_tab():
-    at = AppTest.from_file(str(ROOT / "pages/patients.py"), default_timeout=300).run()
+    at = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=300).run()
     assert not at.exception, at.exception
     assert at.selectbox(key="db_drug_expression").value == "VENETOCLAX"
     assert any("**MAP1A**" in m.value for m in at.markdown)          # proof-of-concept default
@@ -198,17 +198,38 @@ def test_proteomics_cohorts():
     titles = [json.loads(c.proto.spec).get("layout", {}).get("title", {}).get("text", "") for c in at.get("plotly_chart")]
     assert any("STAT5A_S128" in t and "Welch p =" in t for t in titles), titles
     at.selectbox(key="pfq_type").set_value("expression").run()
-    at.selectbox(key="db_layer").set_value("protein").run()
-    assert not at.exception, at.exception
-    info = [d.value for d in at.dataframe if "samples with both" in d.value.columns][0]
+    hl = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=300).run()
+    hl.selectbox(key="db_layer").set_value("protein").run()
+    assert not hl.exception, hl.exception
+    info = [d.value for d in hl.dataframe if "samples with both" in d.value.columns][0]
     assert info["used"].all() and info["samples with both"].min() >= 100   # PTRC protein + Beat AML drug AUC
-    t = [d.value for d in at.dataframe if "concordant" in d.value.columns and "gene" in d.value.columns][0]
+    t = [d.value for d in hl.dataframe if "concordant" in d.value.columns and "gene" in d.value.columns][0]
     assert t.set_index("gene").loc["MAP1A", "r"] > 0                    # MAP1A protein: venetoclax sensitivity
-    at.selectbox(key="db_layer").set_value("phospho").run()
-    assert not at.exception, at.exception
+    hl.selectbox(key="db_layer").set_value("phospho").run()
+    assert not hl.exception, hl.exception
     at.selectbox(key="age_what").set_value("Protein").run()
     assert not at.exception, at.exception
     at.selectbox(key="surv_cohort").set_value("PTRC_BEAT_AML").run()
     at.radio(key="surv_by").set_value("Gene expression").run()
     at.selectbox(key="surv_layer").set_value("phospho").run()
+    assert not at.exception, at.exception
+
+
+@needs_patients
+def test_drug_marker_lookup_tab():
+    at = AppTest.from_file(str(ROOT / "pages/patients.py"), default_timeout=300).run()
+    assert not at.exception, at.exception
+    assert at.selectbox(key="dm_marker_expression").value == "MAP1A"
+    assert at.selectbox(key="dm_drug_expression").value == "VENETOCLAX"
+    m = {x.label: x.value for x in at.metric}
+    assert float(m["Pooled r"]) > 0 and m["Direction"] == "consistent"
+    tab = [d.value for d in at.dataframe if "r (sensitivity)" in d.value.columns][0]
+    import json
+    titles = [json.loads(c.proto.spec).get("layout", {}).get("title", {}).get("text", "") for c in at.get("plotly_chart")]
+    assert all(any(t.startswith(f"{c}<br><sup>n=") for t in titles) for c in tab["cohort"])  # a plot per cohort
+    for layer, marker in [("protein", "BCL2"), ("phospho", "STAT5A_S749")]:
+        at.selectbox(key="dm_layer").set_value(layer).run()
+        at.selectbox(key=f"dm_marker_{layer}").set_value(marker).run()
+        assert not at.exception, (layer, at.exception)
+    at.selectbox(key="dm_stage").set_value("diagnosis only").run()
     assert not at.exception, at.exception

@@ -4,7 +4,7 @@ import streamlit as st
 
 from portal import data, plots
 from portal.age_association import age_association
-from portal.drug_biomarkers import drug_biomarkers
+from portal.drug_biomarkers import drug_marker_lookup
 from portal.feature_query import patient_feature_query
 from portal.survival_view import patient_survival
 
@@ -167,8 +167,7 @@ with tab_fq:
     patient_feature_query()
 
 with tab_drug:
-    st.caption("Built-in analysis 1 · Drug response")
-    drug_biomarkers()
+    drug_marker_lookup()
 
 with tab_age:
     age_association()

@@ -20,8 +20,9 @@ The data is found at, in order: `$AML_PORTAL_DATA`, `data/results/`, then
 | page | content |
 |---|---|
 | Home | resource overview and provenance |
+| Highlights | genome-wide drug-response markers (built-in analysis 1): per-cohort Spearman correlation of every RNA / protein / phosphosite with a drug's response, Fisher-z meta-analysis across cohorts, volcano with selectable genes and per-cohort scatter plots |
 | Cell lines | built-in analysis 2, 70 AML lines. Tabs: *Overview* (data-availability heatmap with annotation tracks), *Feature query* (one gene across all layers, drugs matched by target), *Compare groups* (any grouping from `groupings.tsv` × any layer: volcano, table, per-line plot), *Gene dependency* (CRISPR vs RNAi scatter per gene: mean dependency, or a comparison such as MYC-high vs mTOR-high, TP53-mutant, KMT2A-r, or any custom grouping; plus per-line agreement for one gene) |
-| Patients | seven cohorts: Beat AML, Beat AML proteomics (PTRC), CPTAC adult AML, AML proteogenomics (Zenodo 14160480), Lee 2018, Wang 2022 pediatric, Malani 2022 (RNA, protein, phosphosites, ex vivo drug response). Tabs: *Overview* (summary, per-cohort availability heatmap with annotation tracks), *Feature query* (one gene's RNA, protein or phosphosites in every cohort), *Drug response* (built-in analysis 1: per-cohort Spearman correlation of every gene with a drug's response, Fisher-z meta-analysis across cohorts, select genes on the volcano to see per-cohort scatter plots), *Age association* (genes or drug responses correlated with age at diagnosis, meta-analysed across cohorts), *Survival* (Kaplan–Meier, log-rank, hazard ratio) |
+| Patients | seven cohorts: Beat AML, Beat AML proteomics (PTRC), CPTAC adult AML, AML proteogenomics (Zenodo 14160480), Lee 2018, Wang 2022 pediatric, Malani 2022 (RNA, protein, phosphosites, ex vivo drug response). Tabs: *Overview* (summary, per-cohort availability heatmap with annotation tracks), *Feature query* (one gene's RNA, protein or phosphosites in every cohort), *Drug response* (one marker × one drug: per-cohort scatter, r and p, pooled result), *Age association* (genes or drug responses correlated with age at diagnosis, meta-analysed across cohorts), *Survival* (Kaplan–Meier, log-rank, hazard ratio) |
 | Deconvolution | built-in analysis 3; placeholder until `results/single_cell/` exists |
 | Documentation | overview, data sources (with NCI resource status, from `results/dataset_sources.tsv`), methods and glossary in plain language |
 | Downloads | tabs: *Datasets* (catalog, modality coverage), *Cell-line files*, *Annotation schema* |
@@ -41,7 +42,7 @@ portal/feature_query.py  feature-query tab used by each built-in analysis
 portal/dependency.py     gene-dependency tab (CRISPR vs RNAi) on the cell-lines page
 portal/survival.py       Kaplan–Meier and log-rank (validated against R survival)
 portal/survival_view.py  survival tab on the patients page
-portal/drug_biomarkers.py drug-response tab (built-in analysis 1)
+portal/drug_biomarkers.py drug response: Highlights (genome-wide) and the Patients marker lookup
 portal/age_association.py age-association tab
 tests/            stats vs scipy/R, results consistency, page smoke tests (AppTest)
 ```

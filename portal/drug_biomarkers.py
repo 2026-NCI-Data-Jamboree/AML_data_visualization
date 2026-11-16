@@ -172,3 +172,87 @@ def drug_biomarkers(kp: str = "db") -> None:
                 width="stretch", key=f"{kp}_sc_{gene}_{c}")
     st.caption("r is shown with the sensitivity sign (positive = higher feature, more sensitive); "
                "the y axes show each cohort's own measure (AUC: lower = more sensitive; DSS: higher = more sensitive).")
+
+
+def drug_marker_lookup(kp: str = "dm") -> None:
+    """One marker (gene, protein or phosphosite) x one drug, in every cohort that has both."""
+    idx = data.patient_drug_index()
+    if idx.empty:
+        st.info("No patient cohort has drug response data yet.")
+        return
+    names = data.patient_cohort_names()
+    st.markdown("Pick a marker and a drug to see how the marker relates to drug response in each cohort. "
+                "**Positive r = higher marker, more sensitive**, whatever the cohort's measure. "
+                "For a genome-wide search across all markers, see **Highlights**.")
+
+    has_layer = {c: {k for k, m in data.patient_datasets(c)[["key", "modality"]].itertuples(index=False)
+                     if m != "drug_screen"} for c in idx["cohort"].unique()}
+    order = list(data.LAYER_LABELS)
+    layers = sorted(set().union(*has_layer.values()), key=lambda k: (order.index(k) if k in order else 99, k))
+    c1, c2, c3, c4 = st.columns([2, 2, 3, 2])
+    layer = c1.selectbox("Marker type", layers, format_func=data.layer_label, key=f"{kp}_layer")
+    cohorts = [c for c in has_layer if layer in has_layer[c]]
+    markers = sorted(set().union(*[set(data.feature_names(c, layer)) for c in cohorts]))
+    default = {"expression": "MAP1A", "protein": "MAP1A", "phospho": "STAT5A_S749"}.get(layer)
+    marker = c2.selectbox({"phospho": "Phosphosite"}.get(layer, "Gene"), markers, key=f"{kp}_marker_{layer}",
+                          index=markers.index(default) if default in markers else 0)
+    with_marker = [c for c in cohorts if marker in set(data.feature_names(c, layer))]
+    usable = idx[idx["cohort"].isin(with_marker)]
+    per_key = usable.groupby("compound_key").agg(label=("label", "first"), k=("cohort", "nunique"))
+    per_key = per_key[per_key.index != ""].sort_values(["k", "label"], ascending=[False, True])
+    if per_key.empty:
+        st.warning(f"No cohort has both {marker} and drug response.")
+        return
+    keys = list(per_key.index)
+    key = c3.selectbox("Drug", keys, index=keys.index("VENETOCLAX") if "VENETOCLAX" in keys else 0,
+                       key=f"{kp}_drug_{layer}",
+                       format_func=lambda k: f"{per_key.loc[k, 'label']}  ·  {per_key.loc[k, 'k']} cohort"
+                                             f"{'s' if per_key.loc[k, 'k'] > 1 else ''}")
+    stage = c4.selectbox("Samples", ["all samples", "diagnosis only"], key=f"{kp}_stage")
+    hits = usable[usable["compound_key"] == key]
+
+    rows, plots_in = [], []
+    for c, h in hits.groupby("cohort", sort=False):
+        opts = sorted(h["layer"].unique(), key=lambda l: MEASURE_ORDER.index(l) if l in MEASURE_ORDER else 99)
+        row = h[h["layer"] == opts[0]].iloc[0]
+        sym = data.feature_names(c, layer)
+        feats = [f for f in sym.index[sym == marker] if f in data.patient_values(c, layer).index]
+        x = data.patient_values(c, layer).loc[feats].mean(axis=0)
+        y = data.patient_values(c, row["layer"]).loc[row["feature"]]
+        sm = data.patient_samples(c)
+        keep = set(sm["sample_id"] if stage == "all samples" else sm.loc[sm["timepoint"].eq("diagnosis"), "sample_id"])
+        d = pd.DataFrame({"x": x, "y": y}).dropna()
+        d = d[d.index.isin(keep)].rename_axis("sample_id").reset_index()
+        r = spearman_rows(pd.DataFrame([d["x"].to_numpy()], columns=d["sample_id"]),
+                          d.set_index("sample_id")["y"], min_n=MIN_N)
+        rr, pp = (float(r["r"].iloc[0]), float(r["p"].iloc[0])) if len(r) else (np.nan, np.nan)
+        if row["lower_is_stronger"] and np.isfinite(rr):
+            rr = -rr
+        rows.append({"cohort": names.get(c, c), "drug measure": row["layer_label"], "n": len(d),
+                     "r (sensitivity)": rr, "p": pp})
+        ds = data.patient_datasets(c).set_index("key")
+        plots_in.append((c, d, rr, pp, f"{marker} ({ds.loc[layer, 'unit']})", f"{row['label']} {ds.loc[row['layer'], 'unit']}"))
+
+    tab = pd.DataFrame(rows)
+    ok = {names.get(c, c): pd.DataFrame({"feature": [marker], "n": [r_["n"]], "r": [r_["r (sensitivity)"]]})
+          for c, r_ in zip([p[0] for p in plots_in], rows) if r_["n"] >= MIN_N and np.isfinite(r_["r (sensitivity)"])}
+    if ok:
+        m = meta_correlation(ok).iloc[0]
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Cohorts", f"{int(m['n_cohorts'])}", help=f"with ≥ {MIN_N} samples having both")
+        m2.metric("Pooled r", f"{m['r']:+.2f}", help="positive = higher marker, more sensitive")
+        m3.metric("Pooled p", f"{m['p']:.2g}")
+        m4.metric("Direction", "consistent" if m["concordant"] else "cohorts disagree")
+    else:
+        st.warning(f"No cohort has ≥ {MIN_N} samples with both {marker} and this drug.")
+    st.dataframe(tab, hide_index=True, width="stretch",
+                 column_config={"r (sensitivity)": st.column_config.NumberColumn(format="%+.2f"),
+                                "p": st.column_config.NumberColumn(format="%.2g")})
+    cols = st.columns(min(len(plots_in), 3) or 1)
+    for i, (c, d, rr, pp, xt, yt) in enumerate(plots_in):
+        title = f"{names.get(c, c)}<br><sup>n={len(d)} · r={rr:+.2f} · p={pp:.2g}</sup>" if np.isfinite(rr) else \
+                f"{names.get(c, c)}<br><sup>n={len(d)} · too few samples</sup>"
+        cols[i % len(cols)].plotly_chart(plots.assoc_scatter(d, xt, yt, title=title), width="stretch",
+                                         key=f"{kp}_sc_{c}")
+    st.caption("Spearman correlation per cohort; cohorts combined by Fisher-z meta-analysis (weighted by n − 3). "
+               "y axes show each cohort's own measure (AUC / IC50: lower = more sensitive; DSS: higher = more sensitive).")
