@@ -73,11 +73,84 @@ def cell_line_feature_query(key_prefix: str = "fq") -> None:
                  column_config={"p (Welch)": st.column_config.NumberColumn(format="%.2e")})
 
 
-def patient_feature_query(key_prefix: str = "pfq") -> None:
-    patients = (data.results_dir() or data.require_results()) / "patients"
-    if not patients.is_dir():
-        st.info("Patient cohorts are not prepared yet. This tab will query a gene across the harmonized "
-                "cohorts (RNA, protein, phosphosite, drug response) once `prepare_patient_data.R` in "
-                "AML_data_processing writes `results/patients/`.")
+def patient_feature_query(kp: str = "pfq") -> None:
+    idx = data.patient_gene_index()
+    if idx.empty:
+        st.info("Patient cohorts are not prepared yet. Run `Rscript prepare_patient_data.R` in AML_data_processing.")
         return
-    st.warning("`results/patients/` exists but the patient feature query is not implemented yet.")
+    names = data.patient_cohort_names()
+    genes = sorted(idx["gene"].unique())
+    # groupings offered: union over cohorts, in groupings.tsv order, labelled as in the first cohort
+    glabels = {}
+    for c in names:
+        for col, r in data.patient_groupings(c).iterrows():
+            glabels.setdefault(col, r["label"])
+    st.markdown("Look up one gene in every patient cohort: its expression, and response to drugs that target it.")
+    c1, c2 = st.columns([2, 3])
+    gene = c1.selectbox("Gene (HGNC symbol)", genes, key=f"{kp}_gene",
+                        index=genes.index("MAP1A") if "MAP1A" in genes else 0)
+    opts = list(glabels) or [None]
+    glabels.setdefault(None, "no grouping")
+    grouping = c2.selectbox("Group samples by", opts, format_func=glabels.get, key=f"{kp}_grouping",
+                            index=opts.index("risk_group") if "risk_group" in opts else 0)
+
+    hits = idx[idx["gene"] == gene]
+    summary = []
+    top = st.container()               # summary table goes here, above the per-cohort plots
+    for c in names:
+        h = hits[hits["cohort"] == c]
+        if h.empty:
+            continue
+        s = data.patient_samples_labeled(c)
+        g = data.patient_groupings(c)
+        if grouping is not None and grouping in g.index and g.loc[grouping, "kind"] == "binary":
+            levels = [g.loc[grouping, "true_label"], g.loc[grouping, "false_label"]]
+        elif grouping is not None and grouping in s:
+            levels = list(s[grouping].dropna().astype(str).value_counts().index)
+        else:
+            levels = []
+        grp = (s.set_index("sample_id")[grouping].astype("string") if grouping is not None and grouping in s
+               else pd.Series(dtype="string"))
+        ds = data.patient_datasets(c).set_index("key")
+        st.subheader(names[c])
+        if not levels and grouping is not None:
+            st.caption(f"{glabels[grouping]} is not annotated in this cohort; all samples shown together.")
+        for key, hk in h.groupby("dataset", sort=False):
+            meta = ds.loc[key]
+            V = data.patient_values(c, key)
+            labels = data.patient_features(c, key)["label"]
+            feats = [f for f in dict.fromkeys(hk["feature"]) if f in V.index]
+            if not feats:
+                continue
+            lower = str(meta["lower_is_stronger"]).upper() == "TRUE"
+            if len(feats) > 6:
+                feats = list(V.loc[feats].std(axis=1).sort_values(ascending=False).index[:6])
+            cols = st.columns(min(3, len(feats)))
+            for i, f in enumerate(feats):
+                long = V.loc[f].rename("value").rename_axis("cell_line").reset_index()
+                long["group"] = long["cell_line"].map(grp).fillna("not annotated") if levels else "all samples"
+                via = hk.loc[hk["feature"] == f, "via"].iloc[0]
+                title = (f"{meta['label']}: " + labels.get(f, f) + (f" → {gene}" if via == "drug target" else ""))
+                cols[i % len(cols)].plotly_chart(
+                    plots.strip(long, "value", "group", (levels + ["not annotated"]) if levels else ["all samples"],
+                                title=title, y_title=meta["unit"]),
+                    width="stretch", key=f"{kp}-{c}-{key}-{f}")
+                row = {"cohort": names[c], "layer": meta["label"], "feature": labels.get(f, f),
+                       "n": int(long["value"].notna().sum())}
+                for lv in levels:
+                    row[f"mean {lv}"] = long.loc[long["group"] == lv, "value"].mean()
+                if len(levels) == 2:
+                    r = welch(V.loc[[f]], long.loc[long["group"] == levels[0], "cell_line"].tolist(),
+                              long.loc[long["group"] == levels[1], "cell_line"].tolist())
+                    row["p (Welch)"] = r["p_welch"].iloc[0] if len(r) else np.nan
+                summary.append(row)
+            st.caption(f"{meta['unit']} · {meta['source']}" + (" · lower = more sensitive" if lower else ""))
+    with top:
+        if not summary:
+            st.info("No measurements for this gene in the patient cohorts.")
+            return
+        st.subheader("Summary" + (f" by {glabels[grouping]}" if grouping is not None else ""))
+        st.dataframe(pd.DataFrame(summary), hide_index=True, width="stretch",
+                     column_config={"p (Welch)": st.column_config.NumberColumn(format="%.2e")})
+        st.caption("p values are per feature and not corrected for multiple testing; "
+                   "Welch p is shown when the grouping has exactly two groups.")

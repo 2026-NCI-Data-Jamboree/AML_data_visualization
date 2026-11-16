@@ -49,3 +49,67 @@ def welch(values: pd.DataFrame, group_a: list[str], group_b: list[str], min_n: i
     })[keep]
     res["fdr_welch"] = bh(res["p_welch"].to_numpy())
     return res.sort_values("p_welch").reset_index(drop=True)
+
+
+def spearman_rows(X: pd.DataFrame, y: pd.Series, min_n: int = 10) -> pd.DataFrame:
+    """Spearman correlation of every row of X (features x samples) with y (indexed by sample).
+    Same r and p as scipy.stats.spearmanr on the samples where both are present."""
+    y = y.dropna()
+    cols = [c for c in X.columns if c in y.index]
+    A = X[cols].to_numpy(float)
+    yv = y[cols].to_numpy(float)
+    r = np.full(len(A), np.nan)
+    n = np.isfinite(A).sum(1)
+    complete = n == len(cols)
+    if complete.any() and len(cols) >= min_n:                 # vectorised for complete rows
+        R = pd.DataFrame(A[complete]).rank(axis=1).to_numpy()
+        ry = pd.Series(yv).rank().to_numpy()
+        R -= R.mean(1, keepdims=True)
+        ry = ry - ry.mean()
+        with np.errstate(invalid="ignore", divide="ignore"):
+            r[complete] = (R @ ry) / np.sqrt((R ** 2).sum(1) * (ry ** 2).sum())
+    for i in np.where(~complete & (n >= min_n))[0]:          # rows with missing values
+        ok = np.isfinite(A[i])
+        r[i] = stats.spearmanr(A[i, ok], yv[ok]).statistic
+    with np.errstate(invalid="ignore", divide="ignore"):
+        t = r * np.sqrt((n - 2) / (1 - r ** 2))
+        p = 2 * stats.t.sf(np.abs(t), n - 2)
+    out = pd.DataFrame({"feature": X.index, "n": n, "r": r, "p": p})
+    return out[(out["n"] >= min_n) & np.isfinite(out["r"])].reset_index(drop=True)
+
+
+def meta_correlation(per_cohort: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Combine per-cohort correlations (feature, n, r) by Fisher z, weighted by n - 3 (Stouffer).
+
+    Returns feature, n_cohorts, n_total, r (pooled), z, p, fdr, concordant (all cohorts same sign),
+    I2 (heterogeneity, %), plus r_<cohort> columns.
+    """
+    wide = None
+    for c, d in per_cohort.items():
+        d = d.set_index("feature")[["n", "r"]].rename(columns={"n": f"n_{c}", "r": f"r_{c}"})
+        wide = d if wide is None else wide.join(d, how="outer")
+    if wide is None or wide.empty:
+        return pd.DataFrame(columns=["feature", "n_cohorts", "n_total", "r", "z", "p", "fdr", "concordant", "I2"])
+    cs = list(per_cohort)
+    R = wide[[f"r_{c}" for c in cs]].to_numpy(float)
+    N = wide[[f"n_{c}" for c in cs]].to_numpy(float)
+    W = np.where(np.isfinite(R) & (N > 3), N - 3, 0.0)
+    Zf = np.arctanh(np.clip(np.nan_to_num(R), -0.999999, 0.999999))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        sw = W.sum(1)
+        zbar = (W * Zf).sum(1) / sw
+        z = zbar * np.sqrt(sw)
+        Q = (W * (Zf - zbar[:, None]) ** 2).sum(1)
+        k = (W > 0).sum(1)
+        I2 = np.where(Q > 0, np.clip((Q - (k - 1)) / Q, 0, 1) * 100, 0.0)
+    sgn = np.sign(np.where(W > 0, R, np.nan))
+    out = pd.DataFrame({
+        "feature": wide.index, "n_cohorts": k, "n_total": np.where(W > 0, N, 0).sum(1).astype(int),
+        "r": np.tanh(zbar), "z": z, "p": 2 * stats.norm.sf(np.abs(z)),
+        "concordant": (np.nanmin(sgn, 1) == np.nanmax(sgn, 1)), "I2": I2,
+    })
+    for c in cs:
+        out[f"r_{c}"] = wide[f"r_{c}"].to_numpy()
+    out = out[out["n_cohorts"] > 0].copy()
+    out["fdr"] = bh(out["p"].to_numpy())
+    return out.sort_values("p").reset_index(drop=True)

@@ -160,3 +160,122 @@ def default_pair(column: str, levels: list[str]) -> tuple[str, str]:
     if r["kind"] == "binary":
         return r["true_label"], r["false_label"]
     return levels[0], levels[1] if len(levels) > 1 else levels[0]
+
+
+# ------------------------------------------------------------------- patients ---
+PATIENTS = "patients"
+
+
+def patients_dir() -> Path | None:
+    p = results_dir()
+    return p / PATIENTS if p is not None and (p / PATIENTS).is_dir() else None
+
+
+def patient_cohorts() -> list[str]:
+    """Cohort IDs with a prepared results/patients/<DATASET_ID>/samples.tsv."""
+    p = patients_dir()
+    return sorted(d.name for d in p.iterdir() if (d / "samples.tsv").is_file()) if p else []
+
+
+@st.cache_data(show_spinner=False)
+def patient_samples(cohort: str) -> pd.DataFrame:
+    return _read(patients_dir() / cohort / "samples.tsv", dtype={"sample_id": str, "participant_id": str})
+
+
+@st.cache_data(show_spinner=False)
+def patient_groupings(cohort: str) -> pd.DataFrame:
+    """Optional groupings.tsv (same columns as the cell-line one); empty when absent."""
+    f = patients_dir() / cohort / "groupings.tsv"
+    if not f.exists():
+        return pd.DataFrame(columns=["label", "true_label", "false_label", "kind"]).rename_axis("column")
+    return _read(f, dtype=str).fillna("").set_index("column")
+
+
+@st.cache_data(show_spinner=False)
+def patient_datasets(cohort: str) -> pd.DataFrame:
+    f = patients_dir() / cohort / "datasets.tsv"
+    return _read(f) if f.exists() else pd.DataFrame(columns=["key", "label", "modality", "unit", "source"])
+
+
+@st.cache_data(show_spinner=False)
+def patient_features(cohort: str, key: str) -> pd.DataFrame:
+    return _read(patients_dir() / cohort / "features" / f"{key}.tsv", dtype=str).fillna("").set_index("feature")
+
+
+@st.cache_data(show_spinner="Loading values…")
+def patient_values(cohort: str, key: str) -> pd.DataFrame:
+    """Rows = features (index), columns = sample_id."""
+    return _read(patients_dir() / cohort / "values" / f"{key}.tsv.gz", index_col="feature")
+
+
+def patient_cohort_names() -> dict[str, str]:
+    names = catalog().set_index("dataset_id")["name"].to_dict()
+    return {c: names.get(c, c) for c in patient_cohorts()}
+
+
+@st.cache_data(show_spinner=False)
+def patient_samples_labeled(cohort: str) -> pd.DataFrame:
+    """samples.tsv with binary grouping columns renamed to their true / false labels (as cell_lines())."""
+    g = patient_groupings(cohort)
+    s = _read(patients_dir() / cohort / "samples.tsv", dtype={**{c: str for c in g.index},
+                                                              "sample_id": str, "participant_id": str})
+    for col, r in g.iterrows():
+        if r["kind"] == "binary" and col in s:
+            s[col] = s[col].str.upper().map({"TRUE": r["true_label"], "FALSE": r["false_label"]})
+    return s
+
+
+@st.cache_data(show_spinner=False)
+def patient_availability(cohort: str) -> pd.DataFrame:
+    """samples x layer keys: True when the sample has any value in that layer."""
+    s = patient_samples(cohort)["sample_id"]
+    ds = patient_datasets(cohort)
+    return pd.DataFrame({k: s.isin(patient_values(cohort, k).columns[patient_values(cohort, k).notna().any()]).to_numpy()
+                         for k in ds["key"]}, index=s)
+
+
+@st.cache_data(show_spinner=False)
+def patient_drug_index() -> pd.DataFrame:
+    """One row per (cohort, drug layer, drug): label, compound_key, targets, lower_is_stronger."""
+    rows = []
+    for c in patient_cohorts():
+        ds = patient_datasets(c)
+        for _, d in ds[ds["modality"] == "drug_screen"].iterrows():
+            f = patient_features(c, d["key"]).reset_index()
+            rows.append(f.assign(cohort=c, layer=d["key"], layer_label=d["label"],
+                                 lower_is_stronger=str(d["lower_is_stronger"]).upper() == "TRUE")
+                        [["cohort", "layer", "layer_label", "feature", "label", "compound_key", "targets",
+                          "lower_is_stronger"]])
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame(
+        columns=["cohort", "layer", "layer_label", "feature", "label", "compound_key", "targets", "lower_is_stronger"])
+
+
+@st.cache_data(show_spinner=False)
+def patient_gene_index() -> pd.DataFrame:
+    """One row per (HGNC symbol, cohort, layer, feature); drugs are indexed by their targets."""
+    rows = []
+    for c in patient_cohorts():
+        for key in patient_datasets(c)["key"]:
+            f = patient_features(c, key).reset_index()
+            if "targets" in f:
+                t = f.assign(gene=f["targets"].str.split(";")).explode("gene")
+                t["gene"] = t["gene"].str.strip()
+                rows.append(t.assign(cohort=c, dataset=key, via="drug target")[["gene", "cohort", "dataset", "feature", "via"]])
+            g = f[f.get("gene_symbol", pd.Series("", index=f.index)) != ""]
+            if len(g):
+                rows.append(pd.DataFrame({"gene": g["gene_symbol"], "cohort": c, "dataset": key,
+                                          "feature": g["feature"], "via": "feature"}))
+    idx = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame(columns=["gene", "cohort", "dataset", "feature", "via"])
+    return idx[idx["gene"].notna() & (idx["gene"] != "")]
+
+
+@st.cache_data(show_spinner=False)
+def patient_provenance(cohort: str) -> dict[str, str]:
+    f = patients_dir() / cohort / "provenance.tsv"
+    return dict(_read(f, dtype=str).fillna("").values) if f.exists() else {}
+
+
+@st.cache_data(show_spinner=False)
+def patient_manifest(cohort: str) -> pd.DataFrame:
+    f = patients_dir() / cohort / "manifest.tsv"
+    return _read(f, dtype=str).fillna("") if f.exists() else pd.DataFrame(columns=["path", "kind", "description"])

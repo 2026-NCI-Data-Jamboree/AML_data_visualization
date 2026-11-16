@@ -21,7 +21,7 @@ The data is found at, in order: `$AML_PORTAL_DATA`, `data/results/`, then
 |---|---|
 | Home | resource overview and provenance |
 | Cell lines | built-in analysis 2, 70 AML lines. Tabs: *Cell lines* (data-availability heatmap with annotation tracks), *Feature query* (one gene across all layers, drugs matched by target), *Compare groups* (any grouping from `groupings.tsv` × any layer: volcano, table, per-line plot), *Gene dependency* (CRISPR vs RNAi scatter per gene: mean dependency, or a comparison such as MYC-high vs mTOR-high, TP53-mutant, KMT2A-r, or any custom grouping; plus per-line agreement for one gene) |
-| Patients | tabs: *Cohorts*, *Feature query*, *Drug response biomarkers* (built-in analysis 1). Placeholders until `results/patients/` exists |
+| Patients | four cohorts with ex vivo drug response (Beat AML, Lee 2018, Wang 2022 pediatric, Malani 2022). Tabs: *Cohorts* (summary, per-cohort availability heatmap with annotation tracks), *Feature query* (one gene in every cohort, plus drugs that target it), *Drug response* (built-in analysis 1: per-cohort Spearman correlation of every gene with a drug's response, Fisher-z meta-analysis across cohorts, select genes on the volcano to see per-cohort scatter plots), *Survival* (Kaplan–Meier, log-rank, hazard ratio) |
 | Deconvolution | built-in analysis 3; placeholder until `results/single_cell/` exists |
 | Downloads | tabs: *Datasets* (catalog, modality coverage), *Cell-line files*, *Annotation schema* |
 
@@ -38,6 +38,9 @@ portal/stats.py   Welch t test, BH FDR
 portal/plots.py   volcano, strip/box plots, availability heatmap
 portal/feature_query.py  feature-query tab used by each built-in analysis
 portal/dependency.py     gene-dependency tab (CRISPR vs RNAi) on the cell-lines page
+portal/survival.py       Kaplan–Meier and log-rank (validated against R survival)
+portal/survival_view.py  survival tab on the patients page
+portal/drug_biomarkers.py drug-response biomarker tab (built-in analysis 1)
 tests/            stats vs scipy/R, results consistency, page smoke tests (AppTest)
 ```
 

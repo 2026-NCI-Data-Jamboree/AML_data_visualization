@@ -6,7 +6,8 @@ st.title("Downloads")
 st.markdown("The dataset inventory, the harmonized annotation schema, and every processed file behind "
             "the portal. File layout and columns: `docs/results_contract.md` in AML_data_processing.")
 
-tab_datasets, tab_files, tab_schema = st.tabs(["Datasets", "Cell-line files", "Annotation schema"])
+tab_datasets, tab_files, tab_pfiles, tab_schema = st.tabs(
+    ["Datasets", "Cell-line files", "Patient files", "Annotation schema"])
 
 with tab_datasets:
     cat = data.catalog()
@@ -45,6 +46,26 @@ with tab_files:
             c1.markdown(f"`{r['path']}`: {r['description']}")
             c2.download_button("Download", data.file_path(r["path"]).read_bytes(),
                                file_name=r["path"].split("/")[-1], key=r["path"])
+
+with tab_pfiles:
+    names = data.patient_cohort_names()
+    if not names:
+        st.info("No patient cohort prepared yet (`Rscript prepare_patient_data.R`).")
+    else:
+        cohort = st.selectbox("Cohort", list(names), format_func=names.get, key="dl_cohort")
+        man = data.patient_manifest(cohort)
+        for kind, title in [("samples", "Sample annotation"), ("groupings", "Groupings"),
+                            ("datasets", "Layer index"), ("values", "Values per sample"),
+                            ("features", "Feature annotation"), ("provenance", "Provenance")]:
+            rows = man[man["kind"] == kind]
+            if rows.empty:
+                continue
+            st.subheader(title)
+            for _, r in rows.iterrows():
+                c1, c2 = st.columns([4, 1])
+                c1.markdown(f"`{r['path']}`: {r['description']}")
+                c2.download_button("Download", (data.patients_dir() / cohort / r["path"]).read_bytes(),
+                                   file_name=f"{cohort}_{r['path'].split('/')[-1]}", key=f"{cohort}/{r['path']}")
 
 with tab_schema:
     for name, df in data.schema().items():
