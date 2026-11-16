@@ -37,6 +37,17 @@ thing everywhere in the portal.
     )
     st.caption("All analyses are computed live from the processed data; nothing is pre-selected or filtered "
                "for significance beforehand.")
+    st.subheader("Code")
+    st.markdown(
+        """
+The portal is open source, developed for the 2026 NCI Data Jamboree:
+
+- [AML_data_processing](https://github.com/2026-NCI-Data-Jamboree/AML_data_processing): turns the public
+  datasets into the harmonized data the portal reads (R).
+- [AML_data_visualization](https://github.com/2026-NCI-Data-Jamboree/AML_data_visualization): this portal
+  (Python, Streamlit).
+"""
+    )
 
 with tab_sources:
     src = data.dataset_sources()
