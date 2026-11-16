@@ -127,10 +127,10 @@ def availability_heatmap(lines: list[str], tracks: list[dict], avail: pd.DataFra
 
 
 def platform_scatter(df: pd.DataFrame, x_title: str, y_title: str, style: dict[str, tuple[str, str]],
-                     highlight: str | None = None, n_label: int = 12, zero_lines: tuple = (0, 0),
-                     thresholds: tuple | None = None) -> go.Figure:
+                     n_label: int = 12, zero_lines: tuple = (0, 0), thresholds: tuple | None = None) -> go.Figure:
     """Gene-level CRISPR vs RNAi scatter. df: gene, x, y, cls, score (lowest = labelled first).
-    style: cls -> (colour, legend name), drawn in the given order (last on top)."""
+    style: cls -> (colour, legend name), drawn in the given order (last on top).
+    customdata = gene symbol, so a Streamlit selection returns the genes picked."""
     fig = go.Figure()
     for cls, (col, name) in style.items():
         s = df[df["cls"] == cls]
@@ -139,16 +139,10 @@ def platform_scatter(df: pd.DataFrame, x_title: str, y_title: str, style: dict[s
         fig.add_trace(go.Scattergl(
             x=s["x"], y=s["y"], mode="markers", name=f"{name} ({len(s):,})",
             marker=dict(color=col, size=4 if cls == "ns" else 6, line=dict(width=0)),
-            text=s["gene"], hovertemplate="<b>%{text}</b><br>CRISPR %{x:.3f}<br>RNAi %{y:.3f}<extra></extra>"))
+            customdata=s["gene"], selected=dict(marker=dict(size=10)),
+            hovertemplate="<b>%{customdata}</b><br>CRISPR %{x:.3f}<br>RNAi %{y:.3f}<extra></extra>"))
     for _, t in df.nsmallest(n_label, "score").iterrows():
         fig.add_annotation(x=t["x"], y=t["y"], text=t["gene"], showarrow=False, yshift=9, font=dict(size=10))
-    if highlight is not None and highlight in set(df["gene"]):
-        h = df[df["gene"] == highlight].iloc[0]
-        fig.add_trace(go.Scatter(x=[h["x"]], y=[h["y"]], mode="markers", name=highlight, showlegend=False,
-                                 marker=dict(size=14, color="rgba(0,0,0,0)", line=dict(width=2, color="#eda100")),
-                                 hoverinfo="skip"))
-        fig.add_annotation(x=h["x"], y=h["y"], text=f"<b>{highlight}</b>", showarrow=True, arrowhead=0,
-                           ax=30, ay=-30, font=dict(size=12))
     fig.add_vline(x=zero_lines[0], line_width=1, line_color="#52514e")
     fig.add_hline(y=zero_lines[1], line_width=1, line_color="#52514e")
     if thresholds:
@@ -156,7 +150,8 @@ def platform_scatter(df: pd.DataFrame, x_title: str, y_title: str, style: dict[s
         fig.add_hline(y=thresholds[1], line_width=1, line_dash="dot", line_color="#52514e")
     fig.update_xaxes(automargin=True)
     fig.update_yaxes(automargin=True)
-    fig.update_layout(xaxis_title=x_title, yaxis_title=y_title, height=560,
+    fig.update_layout(xaxis_title=x_title, yaxis_title=y_title, height=560, dragmode="select",
+                      clickmode="event+select",
                       margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=-0.15))
     return fig
 

@@ -12,14 +12,14 @@ from portal import data, plots
 from portal.stats import welch
 
 CRISPR, RNAI = "crispr", "rnai"
+MAX_GENES = 6   # per-line plots drawn for a selection
 MEAN, CUSTOM = "All AML lines: mean dependency", "Custom grouping…"
 # featured comparisons: label -> (grouping column, group A, group B); shown when present in the results
 PRESETS = {
     "MYC-high vs mTOR-high": ("MYC_mTOR_category", "MYC-High / mTOR-Low", "MYC-Low / mTOR-High"),
+    "mTOR-high vs MYC-high": ("MYC_mTOR_category", "MYC-Low / mTOR-High", "MYC-High / mTOR-Low"),
     "TP53-mutant vs TP53-wild-type": ("mut_TP53", "TP53-mutant", "TP53-wild-type"),
     "KMT2A-rearranged vs KMT2A wild-type": ("KMT2A_rearranged", "KMT2A-r", "KMT2A wild-type"),
-    "mTOR-High vs mTOR-Low": ("mTOR_high", "mTOR-High", "mTOR-Low"),
-    "MYC-High vs MYC-Low": ("MYC_high", "MYC-High", "MYC-Low"),
 }
 
 
@@ -159,38 +159,61 @@ def gene_dependency(kp: str = "dep") -> None:
         table["class"] = table.pop("cls").map({k: v[1] for k, v in style.items()})
         table = table.sort_values("p_welch_crispr")
 
-    gene_list = list(table["gene"])
-    top = df.nsmallest(1, "score")["gene"].iloc[0] if len(df) else gene_list[0]
-    q1, q2 = st.columns([2, 3])
-    gene = q1.selectbox("Highlight gene", gene_list, index=gene_list.index(top), key=f"{kp}_gene")
-    st.plotly_chart(plots.platform_scatter(df, x_title, y_title, style, highlight=gene,
-                                           thresholds=thresholds), width="stretch")
+    st.caption("Click a gene, or drag a box / lasso around several (toolbar, top right), to compare "
+               "them line by line below. Double-click the plot to clear the selection.")
+    event = st.plotly_chart(plots.platform_scatter(df, x_title, y_title, style, thresholds=thresholds),
+                            width="stretch", on_select="rerun", selection_mode=("points", "box", "lasso"),
+                            key=f"{kp}_scatter_{file_tag}")
+    selected = selected_genes(event)
 
-    q = q2.text_input("Filter table", placeholder="e.g. BCL2, MCL1, MTOR", key=f"{kp}_filter")
-    view = table if not q else table[table["gene"].str.contains(q, case=False, na=False, regex=False)]
-    st.dataframe(view, hide_index=True, width="stretch", height=320,
+    if selected:
+        view = table[table["gene"].isin(selected)]
+        st.markdown(f"**{len(selected)} selected gene{'s' if len(selected) > 1 else ''}**")
+    else:
+        q = st.text_input("Filter table", placeholder="e.g. BCL2, MCL1, MTOR", key=f"{kp}_filter")
+        view = table if not q else table[table["gene"].str.contains(q, case=False, na=False, regex=False)]
+    st.dataframe(view, hide_index=True, width="stretch", height=min(320, 38 + 35 * len(view)),
                  column_config={c: st.column_config.NumberColumn(format="%.3g") for c in view.columns
                                 if c.startswith(("mean_", "diff_", "p_", "fdr_"))})
     st.download_button("Download table (TSV)", view.to_csv(sep="\t", index=False), key=f"{kp}_dl",
                        file_name=f"crispr_vs_rnai_{file_tag}.tsv")
 
-    # per-line agreement for the highlighted gene: only lines screened by both can be plotted
-    long = pd.DataFrame({"cell_line": shared, "x": C_all.loc[gene, shared].to_numpy(),
-                         "y": R_all.loc[gene, shared].to_numpy()}).dropna()
-    st.subheader(f"{gene}: CRISPR vs RNAi per cell line")
+    # per-line agreement for the selected genes (default: the top gene); only lines in both screens
     if grouping is None:                       # overall view: colour by any grouping
         col = st.selectbox("Colour lines by", list(GL), format_func=GL.get, key=f"{kp}_color",
                            index=list(GL).index("mTOR_high") if "mTOR_high" in GL else 0)
-        long["group"] = long["cell_line"].map(cl.set_index("cell_line")[col].astype("string"))
+        grp = cl.set_index("cell_line")[col].astype("string").fillna("not annotated")
         order = levels_of(col) + ["not annotated"]
-        long["group"] = long["group"].fillna("not annotated")
     else:                                      # comparison: blue = A, red = B, as in the scatter
         grp = pd.Series("not compared", index=cl["cell_line"])
         grp[lines_b], grp[lines_a] = gb, ga
-        long["group"] = long["cell_line"].map(grp)
         order = [ga, gb, "not compared"]
-    r, n = _corr(long["x"], long["y"])
-    st.plotly_chart(plots.line_scatter(long, "group", order, xt, yt),
-                    width="stretch", key=f"{kp}_lines")
-    st.caption(f"{n} lines screened by both · Pearson r = {r:.2f}" if np.isfinite(r)
-               else f"{n} lines screened by both · too few for a correlation")
+
+    shown = selected[:MAX_GENES] if selected else df.nsmallest(1, "score")["gene"].tolist()
+    st.subheader("CRISPR vs RNAi per cell line" + ("" if selected else f": {shown[0]} (top gene)"))
+    if len(selected) > MAX_GENES:
+        st.caption(f"Showing the first {MAX_GENES} of {len(selected)} selected genes (strongest first).")
+    grid = st.columns(1 if len(shown) == 1 else 2)
+    for i, gene in enumerate(shown):
+        long = pd.DataFrame({"cell_line": shared, "x": C_all.loc[gene, shared].to_numpy(),
+                             "y": R_all.loc[gene, shared].to_numpy()}).dropna()
+        long["group"] = long["cell_line"].map(grp)
+        r, n = _corr(long["x"], long["y"])
+        stat = f"{n} lines · r = {r:.2f}" if np.isfinite(r) else f"{n} lines"
+        grid[i % len(grid)].plotly_chart(
+            plots.line_scatter(long, "group", order, xt, yt, title=f"{gene}  ({stat})"),
+            width="stretch", key=f"{kp}_lines_{gene}")
+
+
+def selected_genes(event) -> list[str]:
+    """Genes picked on the scatter (click, box or lasso), in selection order, without duplicates."""
+    try:
+        points = event.selection.points
+    except AttributeError:
+        try:
+            points = event["selection"]["points"]
+        except (KeyError, TypeError):
+            return []
+    genes = [p.get("customdata") for p in points or []]
+    genes = [g[0] if isinstance(g, (list, tuple)) else g for g in genes]
+    return list(dict.fromkeys(g for g in genes if isinstance(g, str) and g))

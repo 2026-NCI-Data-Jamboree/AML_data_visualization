@@ -61,7 +61,7 @@ def test_cell_line_gene_dependency_tab():
     for comparison in PRESETS:                                  # every featured comparison is testable
         at.selectbox(key="dep_comparison").set_value(comparison).run()
         assert not at.exception, (comparison, at.exception)
-        assert at.selectbox(key="dep_gene").value, comparison
+        assert any("CRISPR vs RNAi per cell line" in h.value for h in at.subheader), comparison
     at.selectbox(key="dep_comparison").set_value(CUSTOM).run()
     for grouping in ["disease_oncotree", "mut_FLT3", "population"]:  # too-small groups warn, no crash
         at.selectbox(key="dep_grouping").set_value(grouping).run()
@@ -69,5 +69,12 @@ def test_cell_line_gene_dependency_tab():
     at.toggle(key="dep_shared").set_value(True).run()
     assert not at.exception, at.exception
     at.toggle(key="dep_shared").set_value(False).run()
-    at.selectbox(key="dep_gene").set_value("MCL1").run()
     assert not at.exception, at.exception
+
+
+def test_selected_genes_from_plot_event():
+    from portal.dependency import selected_genes
+    pts = [{"customdata": "BCL2"}, {"customdata": ["MCL1"]}, {"customdata": "BCL2"}, {"x": 1}]
+    assert selected_genes({"selection": {"points": pts}}) == ["BCL2", "MCL1"]
+    assert selected_genes({"selection": {"points": []}}) == []
+    assert selected_genes(None) == []
