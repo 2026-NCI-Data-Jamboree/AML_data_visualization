@@ -39,6 +39,8 @@ def test_meta_correlation_fisher_z():
     assert m.loc["g1", "z"] == pytest.approx(zbar * np.sqrt(150))
     assert bool(m.loc["g1", "concordant"]) and not bool(m.loc["g2", "concordant"])
     assert m.loc["g1", "n_total"] == 156
+    one = meta_correlation({"A": a}).set_index("feature")
+    assert (one["I2"] == 0).all()                                      # no heterogeneity with one cohort
 
 
 @needs_patients
@@ -140,13 +142,13 @@ def test_age_association_tab():
     show.set_value(["MYH11", "HOXA9"]).run()
     assert not at.exception, at.exception
     assert any(m.value.startswith("**HOXA9**") for m in at.markdown)
-    at.radio(key="age_what").set_value("Drug response").run()
+    at.selectbox(key="age_what").set_value("Drug response").run()
     assert not at.exception, at.exception
     [m for m in at.multiselect if m.label == "Show drugs"][0].set_value(["Venetoclax"]).run()
     assert any(m.value.startswith("**Venetoclax**") for m in at.markdown)
     at.multiselect(key="age_cohorts").set_value(["BEAT_AML", "WANG_2022_PED"]).run()
     assert not at.exception, at.exception
-    at.radio(key="age_what").set_value("Gene expression").run()
+    at.selectbox(key="age_what").set_value("Gene expression").run()
     at.text_input(key="age_filter").set_value("HOXA").run()
     assert not at.exception, at.exception
     at.multiselect(key="age_cohorts").set_value(["BEAT_AML", "LEE_2018", "MALANI_2022", "WANG_2022_PED"]).run()
@@ -160,7 +162,7 @@ def test_age_association_tab():
         at.selectbox(key="age_ga").set_value(ga).run()
         at.selectbox(key="age_gb").set_value(gb).run()
         assert not at.exception, (ga, gb, at.exception)
-    at.radio(key="age_what").set_value("Drug response").run()
+    at.selectbox(key="age_what").set_value("Drug response").run()
     assert not at.exception, at.exception
 
 
@@ -170,3 +172,39 @@ def test_age_group_target_is_binary():
         pytest.skip("results/patients not prepared")
     y = _target("BEAT_AML", ("groups", "pediatric (<15)", OTHERS))
     assert set(y.unique()) <= {0.0, 1.0} and y.eq(1).sum() >= 3 and y.eq(0).sum() > 100
+
+
+@needs_patients
+def test_proteomics_cohorts():
+    from portal import data
+    for c in ["PTRC_BEAT_AML", "CPTAC_AML_ADULT"]:
+        if c not in data.patient_cohorts():
+            pytest.skip(f"{c} not prepared")
+        keys = set(data.patient_datasets(c)["key"])
+        assert {"protein", "phospho"} <= keys, (c, keys)
+    names = data.feature_names("CPTAC_AML_ADULT", "phospho")
+    assert names.str.contains("_").all()                                 # sites, not genes
+    at = AppTest.from_file(str(ROOT / "pages/patients.py"), default_timeout=300).run()
+    for dtype in ["protein", "phospho"]:
+        at.selectbox(key="pfq_type").set_value(dtype).run()
+        at.selectbox(key="pfq_gene").set_value("STAT5A").run()
+        assert not at.exception, (dtype, at.exception)
+    sites = at.multiselect(key="pfq_sites_STAT5A")
+    assert 0 < len(sites.value) <= 6 and all(v.startswith("STAT5A_") for v in sites.value)
+    sites.set_value(["STAT5A_S128"]).run()                           # one chosen site
+    assert not at.exception, at.exception
+    at.selectbox(key="pfq_type").set_value("expression").run()
+    at.selectbox(key="db_layer").set_value("protein").run()
+    assert not at.exception, at.exception
+    info = [d.value for d in at.dataframe if "samples with both" in d.value.columns][0]
+    assert info["used"].all() and info["samples with both"].min() >= 100   # PTRC protein + Beat AML drug AUC
+    t = [d.value for d in at.dataframe if "concordant" in d.value.columns and "gene" in d.value.columns][0]
+    assert t.set_index("gene").loc["MAP1A", "r"] > 0                    # MAP1A protein: venetoclax sensitivity
+    at.selectbox(key="db_layer").set_value("phospho").run()
+    assert not at.exception, at.exception
+    at.selectbox(key="age_what").set_value("Protein").run()
+    assert not at.exception, at.exception
+    at.selectbox(key="surv_cohort").set_value("PTRC_BEAT_AML").run()
+    at.radio(key="surv_by").set_value("Gene expression").run()
+    at.selectbox(key="surv_layer").set_value("phospho").run()
+    assert not at.exception, at.exception

@@ -101,7 +101,7 @@ def meta_correlation(per_cohort: dict[str, pd.DataFrame]) -> pd.DataFrame:
         z = zbar * np.sqrt(sw)
         Q = (W * (Zf - zbar[:, None]) ** 2).sum(1)
         k = (W > 0).sum(1)
-        I2 = np.where(Q > 0, np.clip((Q - (k - 1)) / Q, 0, 1) * 100, 0.0)
+        I2 = np.where((k > 1) & (Q > 1e-9), np.clip((Q - (k - 1)) / Q, 0, 1) * 100, 0.0)   # 0 with one cohort
     sgn = np.sign(np.where(W > 0, R, np.nan))
     out = pd.DataFrame({
         "feature": wide.index, "n_cohorts": k, "n_total": np.where(W > 0, N, 0).sum(1).astype(int),

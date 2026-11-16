@@ -32,9 +32,7 @@ def _cohort_assoc(cohort: str, layer: str, drug_layer: str, drug_feature: str, t
 
 
 def _symbols(cohort: str, layer: str) -> pd.Series:
-    f = data.patient_features(cohort, layer)
-    sym = f["gene_symbol"] if "gene_symbol" in f else f["label"]
-    return sym.where(sym != "", f["label"])
+    return data.feature_names(cohort, layer)
 
 
 def drug_biomarkers(kp: str = "db") -> None:
@@ -69,7 +67,7 @@ def drug_biomarkers(kp: str = "db") -> None:
         st.info("No molecular layer in the cohorts that tested this drug.")
         return
     layer = c2.selectbox("Features", layers, key=f"{kp}_layer",
-                         format_func=lambda k: {"expression": "RNA expression"}.get(k, k))
+                         format_func=data.layer_label)
     stage = c3.selectbox("Samples", ["all samples", "diagnosis only"], key=f"{kp}_stage")
     timepoints = ("diagnosis",) if stage == "diagnosis only" else ()
     if targets:
@@ -91,7 +89,7 @@ def drug_biomarkers(kp: str = "db") -> None:
 
     cohorts = [c for c in choice if layer in set(data.patient_datasets(c)["key"])]
     picked = st.multiselect("Cohorts", cohorts, default=cohorts, format_func=lambda c: names.get(c, c),
-                            key=f"{kp}_cohorts_{key}")
+                            key=f"{kp}_cohorts_{key}_{layer}")
     per, info = {}, []
     for c in picked:
         row = hits[(hits["cohort"] == c) & (hits["layer"] == choice[c])].iloc[0]

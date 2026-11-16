@@ -19,7 +19,7 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric("Datasets in catalog", len(cat))
 c2.metric("Processed", int((cat["status"] == "processed").sum()))
 c3.metric("AML cell lines", len(cl))
-c4.metric("Patients (drug-response cohorts)", f"{sum(data.patient_samples(c)['participant_id'].nunique() for c in pt):,}",
+c4.metric("Patients", f"{len(set().union(*[set(data.patient_samples(c)['participant_id'].astype(str)) for c in pt])):,}",
           help=f"{len(pt)} cohorts: " + ", ".join(pt.values()))
 
 st.subheader("What you can do")
@@ -27,10 +27,10 @@ st.markdown(
     "- **Cell lines**: 70 AML cell lines across 11 omics layers. See which data each line has, compare "
     "any two groups (mTOR/MYC-high, KMT2A-rearranged, TP53-mutant, ...) with volcano plots, and look "
     "up one gene across all layers *(built-in analysis 2, cell-line variability)*.\n"
-    "- **Patients**: four adult and pediatric cohorts with ex vivo drug response (Beat AML, Lee 2018, "
-    "Wang 2022, Malani 2022). Find expression markers of drug response that replicate across cohorts "
-    "*(built-in analysis 1)*, look up one gene in every cohort, and compare survival by mutation, risk "
-    "group, MYC/mTOR signature or expression.\n"
+    "- **Patients**: six adult and pediatric cohorts (Beat AML, Beat AML proteomics (PTRC), CPTAC adult AML, "
+    "Lee 2018, Wang 2022, Malani 2022) with RNA, protein, phosphosites and ex vivo drug response. Find RNA "
+    "or protein markers of drug response that replicate across cohorts *(built-in analysis 1)*, look up a "
+    "gene in every cohort, relate features to age, and compare survival.\n"
     "- **Deconvolution**: differentiation-stage composition of patient and cell-line transcriptomes "
     "from a single-cell reference *(built-in analysis 3, in development)*.\n"
     "- **Documentation**: where the data comes from (including which datasets are from NCI resources), "

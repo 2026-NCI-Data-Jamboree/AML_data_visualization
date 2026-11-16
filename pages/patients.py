@@ -21,7 +21,8 @@ with tab_overview:
     c1.metric("Cohorts", len(names))
     n_samples = sum(len(data.patient_samples(c)) for c in names)
     c3.metric("Patient samples", f"{n_samples:,}")
-    c4.metric("Patients", f"{sum(data.patient_samples(c)['participant_id'].nunique() for c in names):,}")
+    c4.metric("Patients", f"{len(set().union(*[set(data.patient_samples(c)['participant_id'].astype(str)) for c in names])):,}",
+              help="Counted once across cohorts (PTRC specimens come from Beat AML patients)")
 
     rows = []
     for c in names:
@@ -52,13 +53,18 @@ with tab_overview:
             av = data.patient_availability(c)
             drug = av[ds.loc[ds["modality"] == "drug_screen", "key"]].any(axis=1)
             rna = av[ds.loc[ds["modality"] == "transcriptomics", "key"]].any(axis=1)
+            prot = av[ds.loc[ds["modality"] == "proteomics", "key"]].any(axis=1)
+            phos = av[ds.loc[ds["modality"] == "phosphoproteomics", "key"]].any(axis=1)
             pts = sm.drop_duplicates("participant_id")
             summ[names[c]] = {
                 "samples": len(sm),
                 "patients": len(pts),
                 "RNA expression": int(rna.sum()),
                 "drug response": int(drug.sum()),
+                "protein": int(prot.sum()),
+                "phosphosites": int(phos.sum()),
                 "RNA + drug": int((rna & drug).sum()),
+                "protein + drug": int((prot & drug).sum()),
                 "mutation calls": int(sm[[x for x in sm if x.startswith("mut_")]].notna().any(axis=1).sum()),
                 "risk group": int(sm["risk_group"].notna().sum()),
                 "KMT2A status": int(sm["KMT2A_rearranged"].notna().sum()),
@@ -68,7 +74,7 @@ with tab_overview:
         summ = pd.DataFrame(summ).T
         st.plotly_chart(plots.availability_summary(summ), width="stretch")
         st.caption("Number of samples with each data type (survival: number of patients). Colour = share of the "
-                   "cohort's samples (patients for survival). RNA + drug = samples usable for the drug response analysis.")
+                   "cohort's samples (patients for survival). RNA or protein + drug = samples usable for the drug response analysis.")
 
 
     if names:

@@ -88,7 +88,12 @@ def patient_feature_query(kp: str = "pfq") -> None:
             if col not in ("MYC_high", "mTOR_high", "MYC_mTOR_category", "cell_state"):   # not offered here
                 glabels.setdefault(col, r["label"])
     st.markdown("Look up one gene in every patient cohort.")
-    c1, c2 = st.columns([2, 3])
+    layer_keys = [k for k in data.LAYER_LABELS if k in set(idx["dataset"])] + \
+                 sorted(set(idx["dataset"]) - set(data.LAYER_LABELS))
+    c0, c1, c2 = st.columns([2, 2, 3])
+    dtype = c0.selectbox("Data type", layer_keys, format_func=data.layer_label, key=f"{kp}_type")
+    idx = idx[idx["dataset"] == dtype]
+    genes = sorted(idx["gene"].unique())
     gene = c1.selectbox("Gene (HGNC symbol)", genes, key=f"{kp}_gene",
                         index=genes.index("MAP1A") if "MAP1A" in genes else 0)
     opts = list(glabels) or [None]
@@ -97,6 +102,23 @@ def patient_feature_query(kp: str = "pfq") -> None:
                             index=opts.index("risk_group") if "risk_group" in opts else 0)
 
     hits = idx[idx["gene"] == gene]
+    sites = None
+    if dtype == "phospho":                     # let people choose which sites of the gene to show
+        n_by_site = {}
+        for c, h in hits.groupby("cohort"):
+            V = data.patient_values(c, "phospho")
+            lab = data.patient_features(c, "phospho")["label"]
+            for f in h["feature"]:
+                if f in V.index:
+                    n_by_site[lab[f]] = n_by_site.get(lab[f], 0) + int(V.loc[f].notna().sum())
+        ranked = sorted(n_by_site, key=lambda x: (-n_by_site[x], x))      # most measured first
+        sites = st.multiselect(
+            f"Sites ({len(ranked)} measured for {gene})", ranked, default=ranked[:6], max_selections=12,
+            format_func=lambda x: f"{x} (n={n_by_site[x]})", key=f"{kp}_sites_{gene}",
+            help="Sites are listed by how many samples measured them, across cohorts.")
+        if not sites:
+            st.info("Pick at least one site.")
+            return
     summary = []
     top = st.container()               # summary table goes here, above the per-cohort plots
     for c in names:
@@ -125,7 +147,12 @@ def patient_feature_query(kp: str = "pfq") -> None:
             if not feats:
                 continue
             lower = str(meta["lower_is_stronger"]).upper() == "TRUE"
-            if len(feats) > 6:
+            if sites is not None:
+                feats = sorted([f for f in feats if labels.get(f) in sites], key=lambda f: sites.index(labels[f]))
+                if not feats:
+                    st.caption("None of the selected sites is measured in this cohort.")
+                    continue
+            elif len(feats) > 6:
                 feats = list(V.loc[feats].std(axis=1).sort_values(ascending=False).index[:6])
             cols = st.columns(min(3, len(feats)))
             for i, f in enumerate(feats):

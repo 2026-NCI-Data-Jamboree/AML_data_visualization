@@ -30,7 +30,7 @@ thing everywhere in the portal.
 | page | what you can do |
 |---|---|
 | Cell lines | see which data each line has; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
-| Patients | see what each cohort contains; look up a gene's expression in every cohort; find genes linked to drug response or to age; compare survival between groups |
+| Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; find genes linked to drug response or to age; compare survival between groups |
 | Deconvolution | planned |
 | Downloads | download every processed file |
 """
@@ -82,6 +82,11 @@ with tab_methods:
     st.subheader("How the data is made comparable")
     st.markdown(
         """
+- **Proteomics**: protein abundance (one value per gene) and phosphosites (one value per site, e.g.
+  STAT5A_Y694) from TMT mass spectrometry, as log2 ratios. Beat AML proteomics (PTRC) covers Beat AML
+  specimens: for these, clinical data and drug response come from the matching Beat AML sample, and RNA
+  is only in the Beat AML cohort, so no patient is counted twice in an analysis. CPTAC adult AML values
+  are corrected for red-blood-cell contamination.
 - **Genes** use HGNC symbols. Patient RNA data keeps protein-coding genes; where a gene has several
   measurements (e.g. array probes) they are averaged.
 - **Mutations** are recorded for 20 genes recurrently mutated in AML (TP53, FLT3, NPM1, NRAS, KRAS, PTPN11,
@@ -115,7 +120,7 @@ with tab_methods:
   separately in each screen.
 - **Feature query**: one gene across every data type, shown by group. p values there are per feature
   and not adjusted.
-- **Drug response** (Patients): in each cohort, every gene's expression is correlated with response to
+- **Drug response** (Patients): in each cohort, every gene's RNA or protein level (or every phosphosite) is correlated with response to
   the chosen drug (Spearman rank correlation, at least 10 samples). The sign is set so that a **positive
   value always means higher expression goes with more sensitivity**, whatever the cohort's measure. The
   cohorts are then combined, giving larger cohorts more weight (Fisher's z with Stouffer's method,

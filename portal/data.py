@@ -242,12 +242,15 @@ def patient_drug_index() -> pd.DataFrame:
         ds = patient_datasets(c)
         for _, d in ds[ds["modality"] == "drug_screen"].iterrows():
             f = patient_features(c, d["key"]).reset_index()
+            dup = d.get("duplicate_of", "")
             rows.append(f.assign(cohort=c, layer=d["key"], layer_label=d["label"],
-                                 lower_is_stronger=str(d["lower_is_stronger"]).upper() == "TRUE")
+                                 lower_is_stronger=str(d["lower_is_stronger"]).upper() == "TRUE",
+                                 duplicate_of="" if pd.isna(dup) else str(dup))
                         [["cohort", "layer", "layer_label", "feature", "label", "compound_key", "targets",
-                          "lower_is_stronger"]])
+                          "lower_is_stronger", "duplicate_of"]])
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame(
-        columns=["cohort", "layer", "layer_label", "feature", "label", "compound_key", "targets", "lower_is_stronger"])
+        columns=["cohort", "layer", "layer_label", "feature", "label", "compound_key", "targets", "lower_is_stronger",
+                 "duplicate_of"])
 
 
 @st.cache_data(show_spinner=False)
@@ -287,3 +290,19 @@ def dataset_sources() -> pd.DataFrame:
     p = results_dir()
     f = p / "dataset_sources.tsv" if p else None
     return _read(f, dtype=str).fillna("") if f is not None and f.exists() else pd.DataFrame()
+
+
+LAYER_LABELS = {"expression": "RNA expression", "protein": "Protein", "phospho": "Phosphosite"}
+
+
+def layer_label(key: str) -> str:
+    return LAYER_LABELS.get(key, key)
+
+
+def feature_names(cohort: str, layer: str) -> pd.Series:
+    """Display name per feature: the HGNC symbol for gene-level layers, the site (e.g. "STAT5A_Y694") for
+    site-level layers such as phospho, the label otherwise (drugs)."""
+    f = patient_features(cohort, layer)
+    if "site" in f or "gene_symbol" not in f:
+        return f["label"]
+    return f["gene_symbol"].where(f["gene_symbol"] != "", f["label"])

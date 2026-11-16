@@ -16,7 +16,8 @@ from portal.stats import meta_correlation, spearman_rows
 MIN_N = 10        # continuous age: patients per cohort
 MIN_GROUP = 3     # age groups: patients per group per cohort
 MAX_SHOWN = 6
-EXPR, DRUG = "Gene expression", "Drug response"
+EXPR, PROT, PHOS, DRUG = "Gene expression", "Protein", "Phosphosite", "Drug response"
+MODALITY = {EXPR: "transcriptomics", PROT: "proteomics", PHOS: "phosphoproteomics"}
 CONT, GROUPS = "Continuous age", "Age groups"
 OTHERS = "all other ages"
 
@@ -64,7 +65,7 @@ def _assoc(cohort: str, layer: str, mode: tuple, drug: bool, lower_is_stronger: 
         if lower_is_stronger:
             res["r"] = -res["r"]
     else:
-        key = f["gene_symbol"].where(f["gene_symbol"] != "", f["label"]) if "gene_symbol" in f else f["label"]
+        key = data.feature_names(cohort, layer)
     res["feature"] = res["feature"].map(key).fillna(res["feature"])
     return res.drop_duplicates("feature")
 
@@ -81,7 +82,7 @@ def age_association(kp: str = "age") -> None:
         "The pediatric cohort (Wang 2022) adds the youngest patients; the others are mostly adults.")
 
     c1, c2, c3 = st.columns([2, 2, 3])
-    what = c1.radio("Features", [EXPR, DRUG], horizontal=True, key=f"{kp}_what")
+    what = c1.selectbox("Features", [EXPR, PROT, PHOS, DRUG], key=f"{kp}_what")
     how = c2.radio("Age as", [CONT, GROUPS], horizontal=True, key=f"{kp}_how")
     picked = c3.multiselect("Cohorts", cohorts, default=cohorts, format_func=names.get, key=f"{kp}_cohorts")
     bands = plots.AGE_GROUPS[:3]
@@ -107,13 +108,16 @@ def age_association(kp: str = "age") -> None:
     per, labels, units = {}, {}, {}
     for c in picked:
         ds = data.patient_datasets(c)
-        if what == EXPR:
-            keys = list(ds.loc[ds["modality"] == "transcriptomics", "key"])
+        if what != DRUG:
+            keys = list(ds.loc[ds["modality"] == MODALITY[what], "key"])
             if keys:
                 per[c] = _assoc(c, keys[0], mode, False, False)
                 units[c] = (keys[0], ds.set_index("key").loc[keys[0], "unit"])
         else:
             d = ds[ds["modality"] == "drug_screen"]
+            if "duplicate_of" in d:                     # e.g. PTRC drug AUC = Beat AML's; count it once
+                src = d["duplicate_of"].fillna("").astype(str)
+                d = d[src.eq("") | ~src.str.split("/").str[0].isin(picked)]
             if len(d):                                  # prefer sDSS > AUC > DSS, as in the drug response tab
                 order = {"drug_sDSS": 0, "drug_auc": 1, "drug_DSS": 2}
                 row = d.assign(o=d["key"].map(order).fillna(9)).sort_values("o").iloc[0]
@@ -134,21 +138,22 @@ def age_association(kp: str = "age") -> None:
         meta["gene"] = meta["gene"].map(lambda k: labels.get(k, k))
     fdr = st.select_slider("FDR threshold", [0.01, 0.05, 0.1, 0.25], value=0.05, key=f"{kp}_fdr")
     if how == CONT:
-        pos, neg = ("higher with age", "lower with age") if what == EXPR else ("more sensitive with age", "less sensitive with age")
+        pos, neg = ("higher with age", "lower with age") if what != DRUG else ("more sensitive with age", "less sensitive with age")
     else:
         short = {b: b.split(" (")[0] for b in bands} | {OTHERS: "other ages"}
         A, B = short[mode[1]], short[mode[2]]
-        pos, neg = ((f"higher in {A}", f"higher in {B}") if what == EXPR
+        pos, neg = ((f"higher in {A}", f"higher in {B}") if what != DRUG
                     else (f"more sensitive in {A}", f"more sensitive in {B}"))
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Cohorts", len(per))
-    m2.metric("Genes tested" if what == EXPR else "Drugs tested", f"{len(meta):,}")
+    m2.metric({EXPR: "Genes tested", PROT: "Proteins tested", PHOS: "Sites tested"}.get(what, "Drugs tested"),
+              f"{len(meta):,}")
     m3.metric(pos[0].upper() + pos[1:] + f", FDR < {fdr}", int(((meta["fdr"] < fdr) & (meta["r"] > 0) & meta["concordant"]).sum()))
     m4.metric(neg[0].upper() + neg[1:] + f", FDR < {fdr}", int(((meta["fdr"] < fdr) & (meta["r"] < 0) & meta["concordant"]).sum()))
     st.caption("Click a point, or drag a box / lasso around several, to see the per-cohort data below. "
                "Double-click the plot to clear the selection.")
     if how == CONT:
-        x_title = ("pooled Spearman r with age (positive = higher in older patients)" if what == EXPR else
+        x_title = ("pooled Spearman r with age (positive = higher in older patients)" if what != DRUG else
                    "pooled Spearman r with age (positive = more sensitive in older patients)")
     else:
         x_title = (f"pooled rank effect, {A} vs {B} (positive = {pos})")
@@ -158,22 +163,23 @@ def age_association(kp: str = "age") -> None:
     selected = selected_genes(event)
 
     table = meta[["gene", "r", "p", "fdr", "n_cohorts", "n_total", "concordant", "I2"] + [f"r_{c}" for c in per]].rename(
-        columns={**{f"r_{c}": f"r {names[c]}" for c in per}, "gene": "gene" if what == EXPR else "drug"})
-    key_col = "gene" if what == EXPR else "drug"
+        columns={**{f"r_{c}": f"r {names[c]}" for c in per},
+                 "gene": "drug" if what == DRUG else ("site" if what == PHOS else "gene")})
+    key_col = "drug" if what == DRUG else ("site" if what == PHOS else "gene")
     if selected:
         view = table[table[key_col].isin(selected)]
     else:
-        q = st.text_input("Filter table", placeholder="e.g. HOXA9, MECOM" if what == EXPR else "e.g. venetoclax",
+        q = st.text_input("Filter table", placeholder="e.g. venetoclax" if what == DRUG else "e.g. HOXA9, MECOM",
                           key=f"{kp}_filter")
         view = table if not q else table[table[key_col].str.contains(q, case=False, na=False, regex=False)]
     st.dataframe(view, hide_index=True, width="stretch", height=min(320, 38 + 35 * len(view)),
                  column_config={c: st.column_config.NumberColumn(format="%.3g") for c in view.columns
                                 if c in ("r", "p", "fdr", "I2") or c.startswith("r ")})
     st.download_button("Download table (TSV)", view.to_csv(sep="\t", index=False), key=f"{kp}_dl",
-                       file_name=f"age_association_{'genes' if what == EXPR else 'drugs'}.tsv")
+                       file_name=f"age_association_{what.lower().replace(' ', '_')}.tsv")
 
     inv = {v: k for k, v in labels.items()}
-    noun = "gene" if what == EXPR else "drug"
+    noun = {DRUG: "drug", PHOS: "site", PROT: "protein"}.get(what, "gene")
     st.subheader("Per-cohort data")
     options = meta["gene"].tolist()                              # ranked: strongest association first
     default = [x for x in selected if x in options][:MAX_SHOWN] or options[:1]
@@ -191,8 +197,8 @@ def age_association(kp: str = "age") -> None:
         for i, c in enumerate(per):
             layer, unit = units[c]
             f = data.patient_features(c, layer)
-            if what == EXPR:
-                sym = f["gene_symbol"].where(f["gene_symbol"] != "", f["label"]) if "gene_symbol" in f else f["label"]
+            if what != DRUG:
+                sym = data.feature_names(c, layer)
                 feats = list(sym.index[sym == item])
             else:
                 feats = list(f.index[f["compound_key"] == inv.get(item, item)])
@@ -205,8 +211,9 @@ def age_association(kp: str = "age") -> None:
             d = pd.DataFrame({"x": p["age_years"], "y": V.loc[feats].mean(axis=0)}).dropna()
             d = d.rename_axis("sample_id").reset_index()
             d["group"] = plots.age_groups(d["x"])
-            rc = per[c].set_index("feature")["r"].get(item if what == EXPR else inv.get(item, item), np.nan)
-            pc = per[c].set_index("feature")["p"].get(item if what == EXPR else inv.get(item, item), np.nan)
+            fkey = inv.get(item, item) if what == DRUG else item
+            rc = per[c].set_index("feature")["r"].get(fkey, np.nan)
+            pc = per[c].set_index("feature")["p"].get(fkey, np.nan)
             title = f"{names[c]}<br><sup>n={len(d)} · r={rc:+.2f} · p={pc:.2g}</sup>"
             if how == CONT:
                 fig = plots.assoc_scatter(d, "age at diagnosis (years)", f"{item} ({unit})", title=title,

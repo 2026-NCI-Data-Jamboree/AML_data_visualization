@@ -100,12 +100,10 @@ def _groups(cohort: str, s: pd.DataFrame, key: str, kp: str) -> tuple[pd.Series,
         ds = data.patient_datasets(cohort).set_index("key")
         layers = _expression_layers(cohort)
         c1, c2, c3 = st.columns([2, 2, 3])
-        layer = c1.selectbox("Layer", layers, format_func=lambda k: ds.loc[k, "label"], key=f"{kp}_layer")
-        f = data.patient_features(cohort, layer)
-        sym = f["gene_symbol"] if "gene_symbol" in f else f.index.to_series()
-        sym = sym.where(sym != "", f["label"])
+        layer = c1.selectbox("Data type", layers, format_func=data.layer_label, key=f"{kp}_layer")
+        sym = data.feature_names(cohort, layer)
         genes = sorted(sym.dropna().unique())
-        gene = c2.selectbox("Gene", genes, key=f"{kp}_gene",
+        gene = c2.selectbox("Phosphosite" if layer == "phospho" else "Gene", genes, key=f"{kp}_gene",
                             index=genes.index("PEAR1") if "PEAR1" in genes else 0)
         split = c3.selectbox("Split patients at", list(SPLITS), key=f"{kp}_split")
         V = data.patient_values(cohort, layer)
