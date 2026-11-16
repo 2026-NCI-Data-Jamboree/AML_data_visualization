@@ -38,11 +38,6 @@ st.markdown(
 
 prov = data.provenance()
 if prov:
-    st.caption(
-        f"Cell-line data prepared {prov.get('prepared_at', '?')} by AML_data_processing "
-        f"commit `{prov.get('processing_commit') or '?'}`"
-        + (" (uncommitted changes)" if prov.get("working_tree_dirty") == "TRUE" else "")
-        + f" · results v{prov.get('results_version', '?')}"
-    )
+    st.caption(f"Data last updated {prov.get('prepared_at', '?')[:10]}.")
     if prov.get("results_version") != data.SUPPORTED_RESULTS_VERSION:
         st.warning(f"This portal expects results v{data.SUPPORTED_RESULTS_VERSION}.")

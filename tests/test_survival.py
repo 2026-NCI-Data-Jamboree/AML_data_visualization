@@ -88,7 +88,7 @@ def test_survival_tab_placeholder_without_patients(tmp_path, monkeypatch):
     at = AppTest.from_file(str(ROOT / "pages/patients.py"), default_timeout=120).run()
     st.cache_data.clear()
     assert not at.exception, at.exception
-    assert any("No prepared patient cohort has survival data" in i.value for i in at.info)
+    assert any("No patient cohort has survival data" in i.value for i in at.info)
 
 
 def test_survival_tab_on_synthetic_cohort(synthetic_results):

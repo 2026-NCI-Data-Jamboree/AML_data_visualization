@@ -142,9 +142,7 @@ def patient_survival(kp: str = "surv") -> None:
         return {t, e} <= set(s.columns) and (s[t].notna() & s[e].notna()).sum() >= 10
     cohorts = [c for c in data.patient_cohorts() if any(has(c, t, e) for t, e in ENDPOINTS.values())]
     if not cohorts:
-        st.info("No prepared patient cohort has survival data yet. This tab fills in once "
-                "`prepare_patient_data.R` writes `results/patients/<DATASET_ID>/samples.tsv` with "
-                "`overall_survival_days` and `os_event` (optionally `event_free_survival_days` / `efs_event`).")
+        st.info("No patient cohort has survival data yet.")
         return
 
     names = data.catalog().set_index("dataset_id")["name"].to_dict()

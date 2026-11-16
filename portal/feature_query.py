@@ -76,7 +76,7 @@ def cell_line_feature_query(key_prefix: str = "fq") -> None:
 def patient_feature_query(kp: str = "pfq") -> None:
     idx = data.patient_gene_index()
     if idx.empty:
-        st.info("Patient cohorts are not prepared yet. Run `Rscript prepare_patient_data.R` in AML_data_processing.")
+        st.info("No patient cohorts are available yet.")
         return
     names = data.patient_cohort_names()
     genes = sorted(idx["gene"].unique())

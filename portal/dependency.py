@@ -43,7 +43,7 @@ def _corr(x: pd.Series, y: pd.Series) -> tuple[float, int]:
 def gene_dependency(kp: str = "dep") -> None:
     dsets = data.datasets().set_index("key")
     if not {CRISPR, RNAI} <= set(dsets.index):
-        st.info("Needs both the CRISPR and the RNAi layer in results/cell_lines.")
+        st.info("This view needs both CRISPR and RNAi screens, which are not available.")
         return
     cl = data.cell_lines()
     G, GL = data.groupings(), data.grouping_labels()

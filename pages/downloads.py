@@ -3,8 +3,8 @@ import streamlit as st
 from portal import data
 
 st.title("Downloads")
-st.markdown("The dataset inventory, the harmonized annotation schema, and every processed file behind "
-            "the portal. File layout and columns: `docs/results_contract.md` in AML_data_processing.")
+st.markdown("The list of datasets, the shared annotation vocabulary, and every processed data file "
+            "behind the portal.")
 
 tab_datasets, tab_files, tab_pfiles, tab_schema = st.tabs(
     ["Datasets", "Cell-line files", "Patient files", "Annotation schema"])
@@ -50,7 +50,7 @@ with tab_files:
 with tab_pfiles:
     names = data.patient_cohort_names()
     if not names:
-        st.info("No patient cohort prepared yet (`Rscript prepare_patient_data.R`).")
+        st.info("No patient cohorts are available yet.")
     else:
         cohort = st.selectbox("Cohort", list(names), format_func=names.get, key="dl_cohort")
         man = data.patient_manifest(cohort)

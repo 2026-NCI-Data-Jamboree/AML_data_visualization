@@ -8,8 +8,8 @@ from portal.feature_query import patient_feature_query
 from portal.survival_view import patient_survival
 
 st.title("Patients")
-st.markdown("Harmonized AML patient cohorts (adult and pediatric) with RNA expression, mutations, clinical "
-            "annotation and ex vivo drug response, prepared by `prepare_patient_data.R` in AML_data_processing.")
+st.markdown("AML patient cohorts, adult and pediatric, with RNA expression, mutations, clinical "
+            "information and drug response measured on patient cells in the lab.")
 
 tab_overview, tab_fq, tab_drug, tab_surv = st.tabs(
     ["Cohorts", "Feature query", "Drug response", "Survival"])
