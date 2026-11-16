@@ -16,6 +16,7 @@ from portal.dependency import selected_genes
 from portal.stats import meta_correlation, spearman_rows
 
 MIN_N = 10
+WITH = {"expression": "RNA", "protein": "protein", "phospho": "phosphosites"}
 MAX_GENES = 6
 # when a cohort has several measures of the same drug, prefer the one that is relative to healthy cells
 MEASURE_ORDER = ["drug_sDSS", "drug_auc", "drug_DSS"]
@@ -48,26 +49,28 @@ def drug_biomarkers(kp: str = "db") -> None:
         "combined by meta-analysis (Fisher z, weighted by n − 3). **Positive = higher feature, more sensitive.** "
         "Proof of concept: MAP1A and venetoclax.")
 
-    # drug choices: compound keys, most widely tested first
-    per_key = idx.groupby("compound_key").agg(label=("label", "first"), cohorts=("cohort", lambda c: sorted(set(c))))
+    # data type first; then the drugs, counting only cohorts that have both the drug and that data type
+    has_layer = {c: {k for k, m in data.patient_datasets(c)[["key", "modality"]].itertuples(index=False)
+                     if m != "drug_screen"} for c in idx["cohort"].unique()}
+    order = list(data.LAYER_LABELS)
+    layers = sorted(set().union(*has_layer.values()), key=lambda k: (order.index(k) if k in order else 99, k))
+    if not layers:
+        st.info("No molecular data in the cohorts with drug response.")
+        return
+    c1, c2, c3 = st.columns([2, 3, 2])
+    layer = c1.selectbox("Features", layers, key=f"{kp}_layer", format_func=data.layer_label)
+    usable = idx[idx["cohort"].map(lambda c: layer in has_layer[c])]
+    per_key = usable.groupby("compound_key").agg(label=("label", "first"), cohorts=("cohort", lambda c: sorted(set(c))))
     per_key["k"] = per_key["cohorts"].apply(len)
     per_key = per_key[per_key.index != ""].sort_values(["k", "label"], ascending=[False, True])
     keys = list(per_key.index)
-    c1, c2, c3 = st.columns([3, 2, 2])
-    key = c1.selectbox(
-        "Drug", keys, index=keys.index("VENETOCLAX") if "VENETOCLAX" in keys else 0, key=f"{kp}_drug",
+    key = c2.selectbox(
+        "Drug", keys, index=keys.index("VENETOCLAX") if "VENETOCLAX" in keys else 0, key=f"{kp}_drug_{layer}",
         format_func=lambda k: f"{per_key.loc[k, 'label']}  ·  {per_key.loc[k, 'k']} cohort"
-                              f"{'s' if per_key.loc[k, 'k'] > 1 else ''}",
+                              f"{'s' if per_key.loc[k, 'k'] > 1 else ''} with {WITH.get(layer, data.layer_label(layer))}",
         on_change=lambda: [st.session_state.pop(k, None) for k in list(st.session_state) if str(k).startswith(f"{kp}_volcano")])
-    hits = idx[idx["compound_key"] == key]
+    hits = usable[usable["compound_key"] == key]
     targets = sorted({t for v in hits["targets"] for t in v.split(";") if t})
-    layers = sorted({k for c in hits["cohort"].unique() for k, m in
-                     data.patient_datasets(c)[["key", "modality"]].itertuples(index=False) if m != "drug_screen"})
-    if not layers:
-        st.info("No molecular layer in the cohorts that tested this drug.")
-        return
-    layer = c2.selectbox("Features", layers, key=f"{kp}_layer",
-                         format_func=data.layer_label)
     stage = c3.selectbox("Samples", ["all samples", "diagnosis only"], key=f"{kp}_stage")
     timepoints = ("diagnosis",) if stage == "diagnosis only" else ()
     if targets:

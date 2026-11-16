@@ -62,15 +62,15 @@ def test_patient_results_follow_contract():
 def test_drug_biomarkers_tab():
     at = AppTest.from_file(str(ROOT / "pages/patients.py"), default_timeout=300).run()
     assert not at.exception, at.exception
-    assert at.selectbox(key="db_drug").value == "VENETOCLAX"
+    assert at.selectbox(key="db_drug_expression").value == "VENETOCLAX"
     assert any("**MAP1A**" in m.value for m in at.markdown)          # proof-of-concept default
     for drug in ["QUIZARTINIB", "CYTARABINE", "TRAMETINIB"]:
-        if drug in at.selectbox(key="db_drug").options:
-            at.selectbox(key="db_drug").set_value(drug).run()
+        if drug in at.selectbox(key="db_drug_expression").options:
+            at.selectbox(key="db_drug_expression").set_value(drug).run()
             assert not at.exception, (drug, at.exception)
     at.selectbox(key="db_stage").set_value("diagnosis only").run()
     assert not at.exception, at.exception
-    at.selectbox(key="db_drug").set_value("VENETOCLAX").run()
+    at.selectbox(key="db_drug_expression").set_value("VENETOCLAX").run()
     at.radio(key="db_measure_MALANI_2022").set_value("drug_DSS").run()
     assert not at.exception, at.exception
     at.text_input(key="db_filter").set_value("BCL2").run()
@@ -138,7 +138,7 @@ def test_age_association_tab():
     lrrn3 = t.set_index("gene").loc["LRRN3"]                    # known to fall with age in blood
     assert lrrn3["r"] < 0 and lrrn3["fdr"] < 1e-6
     show = [m for m in at.multiselect if m.label == "Show genes"][0]
-    assert show.value == ["LRRN3"]                                     # top hit by default
+    assert show.value == [t["gene"].iloc[0]]                            # top hit by default
     show.set_value(["MYH11", "HOXA9"]).run()
     assert not at.exception, at.exception
     assert any(m.value.startswith("**HOXA9**") for m in at.markdown)

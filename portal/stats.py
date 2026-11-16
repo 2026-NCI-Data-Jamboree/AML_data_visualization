@@ -68,9 +68,11 @@ def spearman_rows(X: pd.DataFrame, y: pd.Series, min_n: int = 10) -> pd.DataFram
         ry = ry - ry.mean()
         with np.errstate(invalid="ignore", divide="ignore"):
             r[complete] = (R @ ry) / np.sqrt((R ** 2).sum(1) * (ry ** 2).sum())
-    for i in np.where(~complete & (n >= min_n))[0]:          # rows with missing values
-        ok = np.isfinite(A[i])
-        r[i] = stats.spearmanr(A[i, ok], yv[ok]).statistic
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")                          # constant rows -> NaN, dropped below
+        for i in np.where(~complete & (n >= min_n))[0]:          # rows with missing values
+            ok = np.isfinite(A[i])
+            r[i] = stats.spearmanr(A[i, ok], yv[ok]).statistic
     with np.errstate(invalid="ignore", divide="ignore"):
         t = r * np.sqrt((n - 2) / (1 - r ** 2))
         p = 2 * stats.t.sf(np.abs(t), n - 2)
