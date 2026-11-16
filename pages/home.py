@@ -33,6 +33,8 @@ st.markdown(
     "group, MYC/mTOR signature or expression.\n"
     "- **Deconvolution**: differentiation-stage composition of patient and cell-line transcriptomes "
     "from a single-cell reference *(built-in analysis 3, in development)*.\n"
+    "- **Documentation**: where the data comes from (including which datasets are from NCI resources), "
+    "how it was made comparable, and how each analysis works.\n"
     "- **Downloads**: the dataset inventory, the annotation schema and every processed file."
 )
 

@@ -279,3 +279,11 @@ def patient_provenance(cohort: str) -> dict[str, str]:
 def patient_manifest(cohort: str) -> pd.DataFrame:
     f = patients_dir() / cohort / "manifest.tsv"
     return _read(f, dtype=str).fillna("") if f.exists() else pd.DataFrame(columns=["path", "kind", "description"])
+
+
+@st.cache_data(show_spinner=False)
+def dataset_sources() -> pd.DataFrame:
+    """results/dataset_sources.tsv: every dataset used or proposed, with source and NCI resource status."""
+    p = results_dir()
+    f = p / "dataset_sources.tsv" if p else None
+    return _read(f, dtype=str).fillna("") if f is not None and f.exists() else pd.DataFrame()

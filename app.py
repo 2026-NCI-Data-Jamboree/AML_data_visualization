@@ -8,5 +8,6 @@ st.navigation([
     st.Page("pages/cell_lines.py", title="Cell lines", icon="🧫"),
     st.Page("pages/patients.py", title="Patients", icon="🧑‍⚕️"),
     st.Page("pages/deconvolution.py", title="Deconvolution", icon="🧩"),
+    st.Page("pages/documentation.py", title="Documentation", icon="📖"),
     st.Page("pages/downloads.py", title="Downloads", icon="📥"),
 ]).run()
