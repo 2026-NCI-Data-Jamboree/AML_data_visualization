@@ -7,10 +7,7 @@ from portal.feature_query import cell_line_feature_query
 from portal.stats import welch
 from portal.cooccurrence import cooccurrence_tab
 from portal.copy_number import copy_number_tab
-from portal.mutation_cnv import mutation_cnv_tab
-from portal.mutation_frequency import mutation_frequency_tab
 from portal.similar_lines import similar_lines_tab
-from portal.surfaceome import surfaceome_section
 
 st.title("Cell lines")
 st.caption("Built-in analysis 2 · AML cell-line variability")
@@ -24,14 +21,12 @@ cl = data.cell_lines()
 dsets = data.datasets().set_index("key")
 GROUPINGS = data.grouping_labels()
 
-tab_lines, tab_fq, tab_cmp, tab_dep, tab_co, tab_mf, tab_cn, tab_mc, tab_sim, tab_surf = st.tabs(
-    ["Overview", "Feature query", "Compare groups", "Gene dependency", "Co-occurrence", "Mutation frequency",
-     "Copy number", "Mutation–CNV", "Similar lines", "Cell surface proteins"])
+tab_lines, tab_fq, tab_cmp, tab_dep = st.tabs(["Overview", "Feature query", "Compare groups", "Gene dependency"])
 
 with tab_lines:
     G = data.groupings()
     avail = data.availability().rename(columns=dsets["label"].to_dict())
-    default_tracks = [c for c in ["mTOR_high", "MYC_high", "KMT2A_rearranged", "mut_TP53", "mut_FLT3",
+    default_tracks = [c for c in ["mTOR_high", "MYC_high", "KMT2A_rearranged", "mut_TP53", "mut_FLT3", "FLT3_ITD",
                                   "mut_NRAS", "disease_oncotree", "population", "sex"] if c in G.index]
     c1, c2 = st.columns([3, 1])
     track_cols = c1.multiselect("Annotation tracks", list(G.index), default=default_tracks,
@@ -75,29 +70,20 @@ with tab_lines:
                        file_name="AML_cell_line_annotation.tsv", key="cl_annotation_dl",
                        help="One row per cell line: IDs, disease, age, sex, mutations, KMT2A, MYC / mTOR groups, ...")
 
+    st.header("Co-occurrence of aberrations", divider="gray")
+    cooccurrence_tab()
+
+    st.header("Copy number", divider="gray")
+    copy_number_tab()
+
+    st.header("Similar lines", divider="gray")
+    similar_lines_tab()
+
 with tab_fq:
     cell_line_feature_query()
 
 with tab_dep:  # before the compare block, which may st.stop()
     gene_dependency()
-
-with tab_co:  # these tabs come before the compare block, which may st.stop()
-    cooccurrence_tab()
-
-with tab_mf:
-    mutation_frequency_tab()
-
-with tab_cn:
-    copy_number_tab()
-
-with tab_mc:
-    mutation_cnv_tab()
-
-with tab_sim:
-    similar_lines_tab()
-
-with tab_surf:
-    surfaceome_section()
 
 with tab_cmp:
     c1, c2, c3, c4 = st.columns([3, 2, 2, 3])

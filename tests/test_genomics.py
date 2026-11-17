@@ -1,4 +1,4 @@
-"""Genomic Cell lines tabs: co-occurrence, mutation frequency, copy number, mutation-CNV, similar lines."""
+"""Genomic Cell lines sections (Overview): co-occurrence, copy number, similar lines."""
 from pathlib import Path
 
 import numpy as np
@@ -92,19 +92,6 @@ def test_cell_line_cooccurrence_tab():
 
 
 @needs_data
-def test_cell_line_mutation_frequency_tab():
-    at = AppTest.from_file(str(ROOT / "pages/cell_lines.py"), default_timeout=180).run()
-    assert not at.exception, at.exception
-    assert at.selectbox(key="mf_grouping").value == "KMT2A_rearranged"
-    at.segmented_control(key="mf_sort").set_value("frequency").run()
-    for grouping in ["mut_TP53", "MYC_mTOR_category", "disease_oncotree"]:
-        at.selectbox(key="mf_grouping").set_value(grouping).run()
-        assert not at.exception, (grouping, at.exception)
-    at.multiselect(key="mf_alts").set_value([]).run()
-    assert not at.exception and at.info, at.exception
-
-
-@needs_data
 def test_cell_line_copy_number_tab():
     from portal.cooccurrence import has_cn
     at = AppTest.from_file(str(ROOT / "pages/cell_lines.py"), default_timeout=180).run()
@@ -116,21 +103,6 @@ def test_cell_line_copy_number_tab():
     at.selectbox(key="cn_order").set_value("KMT2A_rearranged").run()
     at.number_input(key="cn_amp").set_value(1.5).run()
     assert not at.exception, at.exception
-
-
-@needs_data
-def test_cell_line_mutation_cnv_tab():
-    from portal.cooccurrence import has_cn
-    at = AppTest.from_file(str(ROOT / "pages/cell_lines.py"), default_timeout=180).run()
-    assert not at.exception, at.exception
-    if not has_cn():
-        pytest.skip("no copy-number layer in these results")
-    for event in ["amplification", "copy-number level", "deletion"]:
-        at.segmented_control(key="mc_event").set_value(event).run()
-        assert not at.exception, (event, at.exception)
-    at.segmented_control(key="mc_res").set_value("cytoband").run()
-    at.multiselect(key="mc_muts").set_value([]).run()
-    assert not at.exception and at.info, at.exception
 
 
 @needs_data

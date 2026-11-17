@@ -40,8 +40,10 @@ def _corr(x: pd.Series, y: pd.Series) -> tuple[float, int]:
     return float(ok.iloc[:, 0].corr(ok.iloc[:, 1])), len(ok)
 
 
-def gene_dependency(kp: str = "dep", fixed: str | None = None) -> None:
-    """fixed: a PRESETS comparison to show without the comparison menu (used by Highlights)."""
+def gene_dependency(kp: str = "dep", fixed: str | list[str] | None = None, shared_toggle: bool = True) -> None:
+    """fixed: a PRESETS comparison to show without the full comparison menu, or a list of PRESETS offered in
+    a short dropdown (used by Highlights; the first is the default). shared_toggle: offer restricting both
+    screens to the lines screened by both (off: each screen always uses all its lines)."""
     dsets = data.datasets().set_index("key")
     if not {CRISPR, RNAI} <= set(dsets.index):
         st.info("This view needs both CRISPR and RNAi screens, which are not available.")
@@ -66,19 +68,25 @@ def gene_dependency(kp: str = "dep", fixed: str | None = None) -> None:
     options = [MEAN] + list(presets) + [CUSTOM]
     c1, c2 = st.columns([3, 2])
     if fixed is not None:
-        if fixed not in presets:
-            st.info(f"{fixed} is not available in the processed cell-line data.")
+        choices = [f for f in ([fixed] if isinstance(fixed, str) else fixed) if f in presets]
+        if not choices:
+            st.info(f"{', '.join([fixed] if isinstance(fixed, str) else fixed)}: not available in the processed "
+                    "cell-line data.")
             return
-        comparison = fixed
-        g, a_lab, b_lab = presets[fixed]
+        if len(choices) == 1:
+            comparison = choices[0]
+        else:
+            comparison = c1.selectbox("Comparison", choices, key=f"{kp}_comparison",
+                                      on_change=lambda: st.session_state.pop(f"{kp}_gene", None))
+        g, a_lab, b_lab = presets[comparison]
         n = cl[g].astype(str).value_counts()
         c1.markdown(f"**{a_lab}** (n={n.get(a_lab, 0)}, blue) vs **{b_lab}** (n={n.get(b_lab, 0)}, red)")
     else:
         comparison = c1.selectbox("Comparison", options, key=f"{kp}_comparison",
                                   on_change=lambda: st.session_state.pop(f"{kp}_gene", None))
-    only_shared = c2.toggle(f"Only the {len(shared)} lines in both screens", key=f"{kp}_shared",
-                            help="Off: each screen uses all its lines (CRISPR "
-                                 f"{C_all.shape[1]}, RNAi {R_all.shape[1]}).")
+    only_shared = shared_toggle and c2.toggle(f"Only the {len(shared)} lines in both screens", key=f"{kp}_shared",
+                                              help="Off: each screen uses all its lines (CRISPR "
+                                                   f"{C_all.shape[1]}, RNAi {R_all.shape[1]}).")
     C, R = C_all.loc[genes], R_all.loc[genes]
     if only_shared:
         C, R = C[shared], R[shared]

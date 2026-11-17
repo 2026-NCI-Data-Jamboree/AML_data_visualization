@@ -1,4 +1,4 @@
-"""Cell lines page, Cell surface proteins tab: highlights, marker expression, multi-antigen."""
+"""Highlights page, Cell surface proteins tab: key findings, marker expression, multi-antigen."""
 from pathlib import Path
 
 import pytest
@@ -13,7 +13,7 @@ needs_surface = pytest.mark.skipif(not (CL / "values" / "surface_george.tsv.gz")
 
 @needs_surface
 def test_surfaceome_page_and_controls():
-    at = AppTest.from_file(str(ROOT / "pages/cell_lines.py"), default_timeout=240).run()
+    at = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=600).run()
     assert not at.exception, at.exception
     assert any(h.value == "Featured findings" for h in at.subheader)
     for rule in ["above percentile", "above value", "detected"]:

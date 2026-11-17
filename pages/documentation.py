@@ -29,8 +29,8 @@ thing everywhere in the portal.
 
 | page | what you can do |
 |---|---|
-| Highlights | MYC-high vs mTOR-high gene dependency in cell lines; genome-wide searches across patient cohorts: markers of drug response, features that change with age, and genes linked to survival |
-| Cell lines | see which data each line has; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
+| Highlights | MYC-high vs mTOR-high gene dependency in cell lines; cell-surface proteins of AML cell lines (markers and multi-antigen targeting); genome-wide searches across patient cohorts: markers of drug response, features that change with age, and genes linked to survival |
+| Cell lines | see which data each line has, which aberrations co-occur, recurrent copy-number changes and which lines are most alike; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
 | Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; check one marker against one drug or against age; compare survival between groups |
 | Deconvolution | planned |
 | Downloads | download every processed file |

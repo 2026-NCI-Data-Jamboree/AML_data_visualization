@@ -82,13 +82,17 @@ def test_selected_genes_from_plot_event():
 
 
 @needs_data
-def test_highlights_myc_mtor_dependency():
+def test_highlights_dependency_comparisons():
     at = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=300).run()
     assert not at.exception, at.exception
+    sb = at.selectbox(key="hl_dep_comparison")                          # short menu, MYC / mTOR first
+    assert sb.options == ["MYC-high vs mTOR-high", "TP53-mutant vs TP53-wild-type"]
+    assert sb.value == "MYC-high vs mTOR-high"
     assert any("MYC-High / mTOR-Low" in m.value and "MYC-Low / mTOR-High" in m.value for m in at.markdown)
-    assert not any(s.key == "hl_dep_comparison" for s in at.selectbox)   # comparison is fixed
-    at.toggle(key="hl_dep_shared").set_value(True).run()
+    sb.set_value("TP53-mutant vs TP53-wild-type").run()
     assert not at.exception, at.exception
+    assert any("TP53-mutant" in m.value and "TP53-wild-type" in m.value for m in at.markdown)
+    assert not any(t.key == "hl_dep_shared" for t in at.toggle)           # no "only lines in both" option here
 
 
 @needs_data

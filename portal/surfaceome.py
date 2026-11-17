@@ -372,7 +372,7 @@ def multi_antigen_tab(M: pd.DataFrame, rule: str, cut: float, kp: str = "ma") ->
 
 # ------------------------------------------------------------------ section (Cell lines tab) ---
 def surfaceome_section() -> None:
-    """Cell surface proteins: the content of the Cell lines page tab."""
+    """Cell surface proteins: the content of the Highlights page tab."""
     if not available():
         st.info("Needs the surface_george layer in results/cell_lines (prepare_cell_line_data.R with the George 2026 "
                 "supplementary files in data/cell_lines/surfaceome_George_2026/).")
@@ -384,7 +384,7 @@ def surfaceome_section() -> None:
                 "abundance; *not detected* means not found on the surface.")
     st.caption(f"Gene symbols: {ALIASES}.")
     rule, cut = positivity_picker(M)
-    tab_hl, tab_mk, tab_ma = st.tabs(["Highlights", "Marker expression", "Multi-antigen"])
+    tab_hl, tab_mk, tab_ma = st.tabs(["Key findings", "Marker expression", "Multi-antigen"])
     with tab_hl:
         highlights_tab()
     with tab_mk:
