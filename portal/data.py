@@ -292,6 +292,59 @@ def dataset_sources() -> pd.DataFrame:
     return _read(f, dtype=str).fillna("") if f is not None and f.exists() else pd.DataFrame()
 
 
+# -------------------------------------------------------------- deconvolution ---
+# Layers are ordinary patient layers (modality "deconvolution"); the extra files are described in
+# AML_data_processing/docs/results_contract.md (Deconvolution).
+DECONVOLUTION_RUN_COLUMNS = ["key", "reference", "method", "level", "quantity", "update_mode", "run_date"]
+
+
+@st.cache_data(show_spinner=False)
+def deconvolution_runs(cohort: str) -> pd.DataFrame:
+    """deconvolution_runs.tsv of a cohort: one row per layer; empty when the cohort has none."""
+    f = patients_dir() / cohort / "deconvolution_runs.tsv" if patients_dir() else None
+    return _read(f, dtype=str).fillna("") if f is not None and f.exists() else pd.DataFrame(
+        columns=DECONVOLUTION_RUN_COLUMNS)
+
+
+def deconvolution_cohorts() -> list[str]:
+    """Cohorts that have at least one deconvolution layer."""
+    return [c for c in patient_cohorts() if len(deconvolution_runs(c))]
+
+
+@st.cache_data(show_spinner=False)
+def deconvolution_warnings(cohort: str) -> pd.DataFrame:
+    """deconvolution_warnings.tsv: key (empty = every layer), scope, sample_id, label, severity, code, message, source."""
+    cols = ["key", "scope", "sample_id", "label", "severity", "code", "message", "source"]
+    f = patients_dir() / cohort / "deconvolution_warnings.tsv" if patients_dir() else None
+    return _read(f, dtype=str).fillna("") if f is not None and f.exists() else pd.DataFrame(columns=cols)
+
+
+def single_cell_references() -> list[str]:
+    """Reference IDs with a results/single_cell/<REFERENCE_ID>/ folder."""
+    p = results_dir()
+    d = p / "single_cell" if p else None
+    return sorted(x.name for x in d.iterdir() if (x / "reference.tsv").is_file()) if d is not None and d.is_dir() else []
+
+
+@st.cache_data(show_spinner=False)
+def reference_table(reference: str) -> pd.DataFrame:
+    """level, label, cell_type, n_cells, n_reference_samples, is_malignant."""
+    t = _read(results_dir() / "single_cell" / reference / "reference.tsv", dtype={"label": str, "cell_type": str})
+    t["is_malignant"] = t["is_malignant"].astype(str).str.upper() == "TRUE"
+    return t
+
+
+@st.cache_data(show_spinner=False)
+def reference_markers(reference: str) -> pd.DataFrame:
+    """level, label, rank, gene_id, gene_symbol, score."""
+    return _read(results_dir() / "single_cell" / reference / "markers.tsv", dtype={"label": str}).fillna("")
+
+
+@st.cache_data(show_spinner=False)
+def reference_provenance(reference: str) -> dict[str, str]:
+    return dict(_read(results_dir() / "single_cell" / reference / "provenance.tsv", dtype=str).fillna("").values)
+
+
 LAYER_LABELS = {"expression": "RNA expression", "protein": "Protein", "phospho": "Phosphosite"}
 
 

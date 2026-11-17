@@ -22,7 +22,7 @@ thing everywhere in the portal.
    does the link hold up across independent cohorts? Example: MAP1A and venetoclax.
 2. **Cell-line variability** (Cell lines): how much AML cell lines differ across data types, depending on
    how they are grouped (TP53 mutation, KMT2A rearrangement, MYC- or mTOR-high, ...).
-3. **Deconvolution** (in development): the mix of differentiation stages in patient and cell-line samples,
+3. **Deconvolution** (Deconvolution): the mix of cell types and cell states in patient bulk RNA samples,
    estimated from a single-cell reference.
 
 **Pages**
@@ -32,7 +32,7 @@ thing everywhere in the portal.
 | Highlights | gene dependency in cell lines (MYC-high vs mTOR-high, TP53-mutant vs wild-type); cell-surface proteins that differ between AML cell-line subgroups; genome-wide searches across patient cohorts: markers of drug response, features that change with age, and genes linked to survival |
 | Cell lines | see which data each line has, which aberrations co-occur, recurrent copy-number changes and which lines are most alike; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
 | Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; check one marker against one drug or against age; compare survival between groups |
-| Deconvolution | planned |
+| Deconvolution | see the estimated cell type and cell state composition of patient samples (three views); browse the single-cell reference |
 | Downloads | download every processed file |
 """
     )
@@ -153,6 +153,29 @@ with tab_methods:
   favorable, intermediate or adverse patients only.
 """
     )
+    st.subheader("Deconvolution")
+    st.markdown(
+        """
+Deconvolution estimates how much of each cell type or state is in a bulk RNA sample, using a single-cell AML
+reference (AML scAtlas, bone marrow at diagnosis). It runs offline in the processing step, once per cohort
+(Wang 2022, Beat AML, Zenodo 14160480), with InstaPrism (an initial fit and a fit that updates the reference to the
+cohort) and NNLS. The portal only displays the results.
+
+- **What a proportion is.** InstaPrism and NNLS report each type's share of the sample's mRNA, not its share of cells
+  (cell types differ in how much RNA they hold). Each layer names its quantity.
+- **Initial vs updated fit.** The initial fit uses the reference as built. The updated fit re-estimates the profiles
+  from the cohort, so one sample's estimate depends on the other samples in the cohort; it is flagged for that reason.
+- **Warnings.** A sample gets a warning when, for example, its initial malignant proportion is below 10% (the updated
+  fit may be unreliable), or hemoglobin genes make up more than 10% of its signal (red cell contamination). Run-level
+  notes cover input conversion, the share of the reference's genes present, and the reference limitation below. The
+  page hides samples with a warning by default; turn that off to see and mark them.
+- **Reference limitation.** The scAtlas malignant profile under-represents monocytic and more committed AML, because
+  blasts in those cases are labelled as normal monocytes or promonocytes. Read the malignant share with that in mind.
+- **Checks.** In Beat AML the malignant proportion rises with the clinical blast percentage (Spearman about 0.5 for
+  the InstaPrism fits), which supports the estimates, but proportions are not calibrated: even at over 80% blasts the
+  mean malignant share is about 0.3.
+"""
+    )
     st.subheader("Things to keep in mind")
     st.markdown(
         """
@@ -177,6 +200,9 @@ with tab_glossary:
         ("Hazard ratio (HR)", "Relative rate of events (e.g. death) in one group versus another"),
         ("OS / EFS", "Overall survival / event-free survival (time to relapse, refractory disease or death)"),
         ("Ex vivo", "Measured on patient cells outside the body"),
+        ("Deconvolution", "Estimating the cell type and cell state proportions of a bulk RNA sample from a single-cell reference"),
+        ("Cell type / cell state", "A cell type is a broad class (e.g. monocyte, T cell, malignant); a cell state is a finer label within a type"),
+        ("Proportion", "The estimated share of a cell type or state in a sample, between 0 and 1; they sum to 1 per sample"),
         ("GDC / PDC", "NCI Genomic Data Commons / Proteomic Data Commons"),
         ("CPTAC / TCGA / TARGET", "NCI programs: Clinical Proteomic Tumor Analysis Consortium / The Cancer Genome "
                                   "Atlas / Therapeutically Applicable Research to Generate Effective Treatments"),
