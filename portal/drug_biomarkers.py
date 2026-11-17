@@ -58,7 +58,8 @@ def drug_biomarkers(kp: str = "db") -> None:
         st.info("No molecular data in the cohorts with drug response.")
         return
     c1, c2, c3 = st.columns([2, 3, 2])
-    layer = c1.selectbox("Features", layers, key=f"{kp}_layer", format_func=data.layer_label)
+    layer = c1.selectbox("Features", layers, key=f"{kp}_layer", format_func=data.layer_label,
+                         index=layers.index("protein") if "protein" in layers else 0)
     usable = idx[idx["cohort"].map(lambda c: layer in has_layer[c])]
     per_key = usable.groupby("compound_key").agg(label=("label", "first"), cohorts=("cohort", lambda c: sorted(set(c))))
     per_key["k"] = per_key["cohorts"].apply(len)

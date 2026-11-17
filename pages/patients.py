@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 from portal import data, plots
-from portal.age_association import age_association
+from portal.age_association import age_feature_lookup
 from portal.drug_biomarkers import drug_marker_lookup
 from portal.feature_query import patient_feature_query
 from portal.survival_view import patient_survival
@@ -170,7 +170,7 @@ with tab_drug:
     drug_marker_lookup()
 
 with tab_age:
-    age_association()
+    age_feature_lookup()
 
 with tab_surv:
     patient_survival()

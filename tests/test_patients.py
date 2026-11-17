@@ -62,6 +62,9 @@ def test_patient_results_follow_contract():
 def test_drug_biomarkers_tab():
     at = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=300).run()
     assert not at.exception, at.exception
+    assert at.selectbox(key="db_layer").value == "protein"              # protein by default
+    assert at.selectbox(key="age_what").value == "Protein"
+    at.selectbox(key="db_layer").set_value("expression").run()
     assert at.selectbox(key="db_drug_expression").value == "VENETOCLAX"
     assert any("**MAP1A**" in m.value for m in at.markdown)          # proof-of-concept default
     for drug in ["QUIZARTINIB", "CYTARABINE", "TRAMETINIB"]:
@@ -132,8 +135,9 @@ def test_age_groups_nci_bands():
 
 @needs_patients
 def test_age_association_tab():
-    at = AppTest.from_file(str(ROOT / "pages/patients.py"), default_timeout=300).run()
+    at = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=300).run()
     assert not at.exception, at.exception
+    at.selectbox(key="age_what").set_value("Gene expression").run()
     t = [d.value for d in at.dataframe if "concordant" in d.value.columns and "gene" in d.value.columns][-1]
     lrrn3 = t.set_index("gene").loc["LRRN3"]                    # known to fall with age in blood
     assert lrrn3["r"] < 0 and lrrn3["fdr"] < 1e-6
@@ -207,7 +211,7 @@ def test_proteomics_cohorts():
     assert t.set_index("gene").loc["MAP1A", "r"] > 0                    # MAP1A protein: venetoclax sensitivity
     hl.selectbox(key="db_layer").set_value("phospho").run()
     assert not hl.exception, hl.exception
-    at.selectbox(key="age_what").set_value("Protein").run()
+    at.selectbox(key="af_what").set_value("Protein").run()
     assert not at.exception, at.exception
     at.selectbox(key="surv_cohort").set_value("PTRC_BEAT_AML").run()
     at.radio(key="surv_by").set_value("Gene expression").run()
@@ -221,7 +225,9 @@ def test_drug_marker_lookup_tab():
     assert not at.exception, at.exception
     assert at.selectbox(key="dm_marker_expression").value == "MAP1A"
     assert at.selectbox(key="dm_drug_expression").value == "VENETOCLAX"
-    m = {x.label: x.value for x in at.metric}
+    m = {}
+    for x in at.metric:                                                 # first occurrence = Drug response tab
+        m.setdefault(x.label, x.value)
     assert float(m["Pooled r"]) > 0 and m["Direction"] == "consistent"
     tab = [d.value for d in at.dataframe if "r (sensitivity)" in d.value.columns][0]
     import json
@@ -232,4 +238,21 @@ def test_drug_marker_lookup_tab():
         at.selectbox(key=f"dm_marker_{layer}").set_value(marker).run()
         assert not at.exception, (layer, at.exception)
     at.selectbox(key="dm_stage").set_value("diagnosis only").run()
+    assert not at.exception, at.exception
+
+
+@needs_patients
+def test_age_feature_lookup_tab():
+    at = AppTest.from_file(str(ROOT / "pages/patients.py"), default_timeout=300).run()
+    assert not at.exception, at.exception
+    assert at.selectbox(key="af_item_Gene expression").value == "LRRN3"
+    tab = [d.value for d in at.dataframe if {"used", "r"} <= set(d.value.columns)][-1]
+    assert (tab.loc[tab["used"], "r"] < 0).all()                     # LRRN3 lower with age in every cohort
+    at.radio(key="af_how").set_value("Age groups").run()
+    assert not at.exception, at.exception
+    for what in ["Protein", "Phosphosite", "Drug response"]:
+        at.selectbox(key="af_what").set_value(what).run()
+        assert not at.exception, (what, at.exception)
+    at.selectbox(key="af_ga").set_value("pediatric (<15)").run()
+    at.selectbox(key="af_gb").set_value("all other ages").run()
     assert not at.exception, at.exception

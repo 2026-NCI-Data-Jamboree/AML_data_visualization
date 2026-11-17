@@ -25,14 +25,14 @@ c3.metric("AML cell lines", len(cl))
 
 st.subheader("What you can do")
 st.markdown(
-    "- **Highlights**: genome-wide search for RNA, protein or phosphosite markers of drug response that "
-    "replicate across patient cohorts *(built-in analysis 1)*.\n"
+    "- **Highlights**: genome-wide searches across patient cohorts: RNA, protein or phosphosite markers of "
+    "drug response that replicate across cohorts *(built-in analysis 1)*, and features that change with age.\n"
     "- **Cell lines**: 70 AML cell lines across 11 omics layers. See which data each line has, compare "
     "any two groups (mTOR/MYC-high, KMT2A-rearranged, TP53-mutant, ...) with volcano plots, and look "
     "up one gene across all layers *(built-in analysis 2, cell-line variability)*.\n"
     "- **Patients**: seven adult and pediatric cohorts (Beat AML, Beat AML proteomics (PTRC), CPTAC adult AML, "
     "AML proteogenomics from Zenodo, Lee 2018, Wang 2022, Malani 2022) with RNA, protein, phosphosites and ex vivo drug response. Check how a "
-    "marker relates to a drug in every cohort, look up a gene, relate features to age, and compare survival.\n"
+    "marker relates to a drug or to age in every cohort, look up a gene, and compare survival.\n"
     "- **Deconvolution**: differentiation-stage composition of patient and cell-line transcriptomes "
     "from a single-cell reference *(built-in analysis 3, in development)*.\n"
     "- **Documentation**: where the data comes from (including which datasets are from NCI resources), "

@@ -82,7 +82,7 @@ def age_association(kp: str = "age") -> None:
         "The pediatric cohort (Wang 2022) adds the youngest patients; the others are mostly adults.")
 
     c1, c2, c3 = st.columns([2, 2, 3])
-    what = c1.selectbox("Features", [EXPR, PROT, PHOS, DRUG], key=f"{kp}_what")
+    what = c1.selectbox("Features", [EXPR, PROT, PHOS, DRUG], index=1, key=f"{kp}_what")
     how = c2.radio("Age as", [CONT, GROUPS], horizontal=True, key=f"{kp}_how")
     picked = c3.multiselect("Cohorts", cohorts, default=cohorts, format_func=names.get, key=f"{kp}_cohorts")
     bands = plots.AGE_GROUPS[:3]
@@ -233,3 +233,114 @@ def age_association(kp: str = "age") -> None:
                + (" For drugs, r is shown with the sensitivity sign (positive = more sensitive in older patients); "
                   "the y axes show each cohort's own measure (AUC: lower = more sensitive; DSS: higher = more sensitive)."
                   if what == DRUG else ""))
+
+
+def age_feature_lookup(kp: str = "af") -> None:
+    """One feature (gene, protein, phosphosite or drug) against age at diagnosis, in every cohort."""
+    names = data.patient_cohort_names()
+    cohorts = [c for c in names if len(one_per_patient(c)) >= MIN_N]
+    if not cohorts:
+        st.info("No patient cohort has age information.")
+        return
+    st.markdown("Pick a gene, protein, phosphosite or drug to see how it changes with age at diagnosis in each "
+                "cohort (one sample per patient). For a genome-wide search, see **Highlights**.")
+    c1, c2, c3 = st.columns([2, 3, 2])
+    what = c1.selectbox("Feature type", [EXPR, PROT, PHOS, DRUG], key=f"{kp}_what")
+    how = c3.radio("Age as", [CONT, GROUPS], horizontal=True, key=f"{kp}_how")
+
+    # per cohort: the layer to use for this feature type, and its feature -> display name map
+    src = {}
+    for c in cohorts:
+        ds = data.patient_datasets(c)
+        if what != DRUG:
+            keys = list(ds.loc[ds["modality"] == MODALITY[what], "key"])
+            if keys:
+                src[c] = (keys[0], data.feature_names(c, keys[0]), False)
+        else:
+            d = ds[ds["modality"] == "drug_screen"]
+            if "duplicate_of" in d:                     # e.g. PTRC drug AUC = Beat AML's: use Beat AML's
+                dup = d["duplicate_of"].fillna("").astype(str)
+                d = d[dup.eq("") | ~dup.str.split("/").str[0].isin(cohorts)]
+            if len(d):
+                order = {"drug_sDSS": 0, "drug_auc": 1, "drug_DSS": 2}
+                row = d.assign(o=d["key"].map(order).fillna(9)).sort_values("o").iloc[0]
+                f = data.patient_features(c, row["key"])
+                src[c] = (row["key"], f["label"], str(row["lower_is_stronger"]).upper() == "TRUE")
+    if not src:
+        st.info(f"No cohort with age has {what.lower()} data.")
+        return
+    counts = pd.Series([n for _, sym, _ in src.values() for n in set(sym)]).value_counts()
+    options = sorted(counts.index, key=lambda x: (-counts[x], x)) if what == DRUG else sorted(counts.index)
+    default = {EXPR: "LRRN3", PROT: "CD34", PHOS: None, DRUG: "Venetoclax"}.get(what)
+    item = c2.selectbox({DRUG: "Drug", PHOS: "Phosphosite"}.get(what, "Gene"), options, key=f"{kp}_item_{what}",
+                        index=options.index(default) if default in options else 0,
+                        format_func=lambda x: f"{x}  ·  {counts[x]} cohort{'s' if counts[x] > 1 else ''}")
+    bands = plots.AGE_GROUPS[:3]
+    if how == GROUPS:
+        g1, g2, _ = st.columns([2, 2, 3])
+        ga = g1.selectbox("Group A (blue)", bands, index=bands.index("AYA (15-39)"), key=f"{kp}_ga")
+        rest = [b for b in bands if b != ga] + [OTHERS]
+        gb = g2.selectbox("Group B (red)", rest, index=rest.index("adult (≥40)") if "adult (≥40)" in rest else 0,
+                          key=f"{kp}_gb")
+        mode = ("groups", ga, gb)
+    else:
+        mode = ("continuous",)
+
+    rows, panels, per = [], [], {}
+    for c, (layer, sym, lower) in src.items():
+        feats = [f for f in sym.index[sym == item] if f in data.patient_values(c, layer).index]
+        if not feats:
+            continue
+        p = one_per_patient(c).set_index("sample_id")
+        d = pd.DataFrame({"age": p["age_years"], "y": data.patient_values(c, layer).loc[feats].mean(axis=0)}).dropna()
+        t = _target(c, mode)
+        dd = d[d.index.isin(t.index)]
+        need = MIN_N if how == CONT else 2 * MIN_GROUP
+        enough = len(dd) >= need and (how == CONT or (t[dd.index].eq(1).sum() >= MIN_GROUP and t[dd.index].eq(0).sum() >= MIN_GROUP))
+        rr = pp = np.nan
+        if enough:
+            r = spearman_rows(pd.DataFrame([dd["y"].to_numpy()], columns=dd.index), t[dd.index], min_n=need)
+            if len(r):
+                rr, pp = float(r["r"].iloc[0]), float(r["p"].iloc[0])
+                if lower:
+                    rr = -rr
+                per[c] = pd.DataFrame({"feature": [item], "n": [len(dd)], "r": [rr]})
+        rows.append({"cohort": names[c], "n": len(dd), "r": rr, "p": pp, "used": c in per})
+        unit = data.patient_datasets(c).set_index("key").loc[layer, "unit"]
+        panels.append((c, d.rename_axis("sample_id").reset_index(), rr, pp, f"{item} ({unit})"))
+
+    if per:
+        m = meta_correlation(per).iloc[0]
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Cohorts", int(m["n_cohorts"]))
+        m2.metric("Pooled r", f"{m['r']:+.2f}",
+                  help=("positive = " + ("higher in older patients" if how == CONT else f"higher in {mode[1]}"))
+                       + (" (drugs: more sensitive)" if what == DRUG else ""))
+        m3.metric("Pooled p", f"{m['p']:.2g}")
+        m4.metric("Direction", "consistent" if m["concordant"] else "cohorts disagree")
+    else:
+        st.warning("No cohort has enough patients for this comparison." if how == GROUPS else
+                   f"No cohort has ≥ {MIN_N} patients with both age and {item}.")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
+                 column_config={"r": st.column_config.NumberColumn(format="%+.2f"),
+                                "p": st.column_config.NumberColumn(format="%.2g")})
+    cols = st.columns(min(len(panels), 3) or 1)
+    for i, (c, d, rr, pp, yt) in enumerate(panels):
+        title = (f"{names[c]}<br><sup>n={len(d)} · r={rr:+.2f} · p={pp:.2g}</sup>" if np.isfinite(rr) else
+                 f"{names[c]}<br><sup>n={len(d)} · not enough patients</sup>")
+        d = d.rename(columns={"age": "x"})
+        if how == CONT:
+            d["group"] = plots.age_groups(d["x"])
+            fig = plots.assoc_scatter(d, "age at diagnosis (years)", yt, title=title, group_colors=plots.AGE_COLORS)
+        else:
+            y01 = _target(c, mode)
+            d["cmp"] = d["sample_id"].map(y01).map({1.0: mode[1], 0.0: mode[2]}).fillna("not compared")
+            d["cell_line"] = d["sample_id"]
+            fig = plots.strip(d, "y", "cmp", [mode[1], mode[2], "not compared"], title=title, y_title=yt,
+                              colors={mode[1]: plots.COL_A, mode[2]: plots.COL_B, "not compared": plots.COL_NS})
+            fig.update_layout(title=dict(font=dict(size=13)), margin=dict(t=60))
+        cols[i % len(cols)].plotly_chart(fig, width="stretch", key=f"{kp}_sc_{c}")
+    st.caption(("Spearman correlation with age in years" if how == CONT else
+                "Rank comparison of the two age groups (Spearman with group membership)")
+               + "; cohorts combined by Fisher-z meta-analysis (weighted by n − 3)."
+               + (" Drugs: r has the sensitivity sign; y axes show each cohort's own measure." if what == DRUG else ""))

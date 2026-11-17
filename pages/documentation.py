@@ -29,9 +29,9 @@ thing everywhere in the portal.
 
 | page | what you can do |
 |---|---|
-| Highlights | genome-wide search for markers of drug response that replicate across patient cohorts |
+| Highlights | genome-wide searches across patient cohorts: markers of drug response, and features that change with age |
 | Cell lines | see which data each line has; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
-| Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; check one marker against one drug; find genes linked to age; compare survival between groups |
+| Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; check one marker against one drug or against age; compare survival between groups |
 | Deconvolution | planned |
 | Downloads | download every processed file |
 """
@@ -127,7 +127,7 @@ with tab_methods:
   cohorts are then combined, giving larger cohorts more weight (Fisher's z with Stouffer's method,
   weighted by sample size), and adjusted for the number of genes tested (FDR). *Cohorts agree* means the
   link has the same direction in every cohort.
-- **Age association** (Patients): every gene's expression (or response to every drug) is related to age
+- **Age association** (Patients: one feature; Highlights: every feature at once): every gene's expression (or response to every drug) is related to age
   at diagnosis, one sample per patient, either as **continuous age** (Spearman correlation with age in
   years; at least 10 patients) or between two **age groups** (e.g. AYA vs adult; a rank comparison of the
   two groups, at least 3 patients in each). Cohorts are combined as in the drug response analysis.
