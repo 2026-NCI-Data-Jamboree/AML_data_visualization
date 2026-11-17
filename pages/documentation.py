@@ -158,8 +158,15 @@ with tab_methods:
         """
 Deconvolution estimates how much of each cell type or state is in a bulk RNA sample, using a single-cell AML
 reference (AML scAtlas, bone marrow at diagnosis). It runs offline in the processing step, once per cohort
-(Wang 2022, Beat AML, Zenodo 14160480), with InstaPrism (an initial fit and a fit that updates the reference to the
-cohort) and NNLS. The portal only displays the results.
+(Wang 2022, Malani 2022, St. Jude 2024, Beat AML and four AMLmap studies: Leucegene, TCGA, TARGET, LUMC), with InstaPrism (an initial fit and
+a fit that updates the reference to the cohort) and NNLS. The portal only displays the results.
+
+- **Which data can be used.** Raw read counts, or counts per million (CPM). Data normalized by transcript length (TPM,
+  RPKM, FPKM) is never used: the reference is built from single-cell counts, which are not biased by gene length, and
+  dividing by transcript length changes the relative weight of genes, so the proportions would be distorted. A cohort
+  with only length-normalized RNA (for example Zenodo 14160480) is therefore not deconvolved.
+  Where only a log-scale CPM layer exists (Wang 2022, St. Jude 2024) it is converted back to CPM; St. Jude's values were
+  batch-corrected after the CPM step, so they are approximate and flagged.
 
 - **What a proportion is.** InstaPrism and NNLS report each type's share of the sample's mRNA, not its share of cells
   (cell types differ in how much RNA they hold). Each layer names its quantity.
@@ -171,9 +178,9 @@ cohort) and NNLS. The portal only displays the results.
   page hides samples with a warning by default; turn that off to see and mark them.
 - **Reference limitation.** The scAtlas malignant profile under-represents monocytic and more committed AML, because
   blasts in those cases are labelled as normal monocytes or promonocytes. Read the malignant share with that in mind.
-- **Checks.** In Beat AML the malignant proportion rises with the clinical blast percentage (Spearman about 0.5 for
-  the InstaPrism fits), which supports the estimates, but proportions are not calibrated: even at over 80% blasts the
-  mean malignant share is about 0.3.
+- **Checks.** In Beat AML the malignant proportion rises with the clinical blast percentage (Spearman 0.37 for the
+  InstaPrism initial fit and 0.48 for the updated fit, 362 samples with a blast percentage), which supports the
+  estimates, but proportions are not calibrated: even at over 80% blasts the mean malignant share is about 0.35.
 """
     )
     st.subheader("Things to keep in mind")
