@@ -123,7 +123,7 @@ def drug_biomarkers(kp: str = "db") -> None:
     st.caption("Click a feature, or drag a box / lasso around several, to see the per-cohort data below. "
                "Double-click the plot to clear the selection.")
     event = st.plotly_chart(
-        plots.meta_volcano(meta, "pooled Spearman r (positive = higher feature, more sensitive)", fdr=fdr),
+        plots.meta_volcano(meta, "pooled Spearman r (positive = higher feature, more sensitive)", fdr=fdr, y="fdr"),
         width="stretch", on_select="rerun", selection_mode=("points", "box", "lasso"),
         key=f"{kp}_volcano_{key}_{layer}_{stage}_{'-'.join(picked)}")
     selected = selected_genes(event)
@@ -131,20 +131,23 @@ def drug_biomarkers(kp: str = "db") -> None:
     rcols = [f"r_{c}" for c in per]
     table = meta[["gene", "r", "p", "fdr", "n_cohorts", "n_total", "concordant", "I2"] + rcols].rename(
         columns={f"r_{c}": f"r {names.get(c, c)}" for c in per})
-    if selected:
-        view = table[table["gene"].isin(selected)]
-    else:
-        q = st.text_input("Filter table", placeholder="e.g. MAP1A, BCL2, CD14", key=f"{kp}_filter")
-        view = table if not q else table[table["gene"].str.contains(q, case=False, na=False, regex=False)]
-    st.dataframe(view, hide_index=True, width="stretch", height=min(320, 38 + 35 * len(view)),
-                 column_config={c: st.column_config.NumberColumn(format="%.3g") for c in view.columns
-                                if c in ("r", "p", "fdr", "I2") or c.startswith("r ")})
+    view = table[table["gene"].isin(selected)] if selected else table
+    tbl = st.dataframe(view, hide_index=True, width="stretch", height=min(320, 38 + 35 * len(view)),
+                       on_select="rerun", selection_mode="multi-row",
+                       key=f"{kp}_table_{key}_{layer}_{stage}_{'-'.join(picked)}_{len(view)}",
+                       column_config={c: st.column_config.NumberColumn(format="%.3g") for c in view.columns
+                                      if c in ("r", "p", "fdr", "I2") or c.startswith("r ")})
+    st.caption("Select rows in the table (tick boxes on the left) to show those features below; "
+               "otherwise the plot selection, or the top row, is shown.")
     st.download_button("Download table (TSV)", view.to_csv(sep="\t", index=False), key=f"{kp}_dl",
                        file_name=f"drug_biomarkers_{key}_{layer}.tsv")
 
-    default = ["MAP1A"] if key == "VENETOCLAX" and "MAP1A" in set(meta["gene"]) else meta["gene"].head(1).tolist()
-    shown = (selected or default)[:MAX_GENES]
-    st.subheader("Per-cohort data" + ("" if selected else f": {shown[0]}"))
+    rows = list(tbl.selection.rows) if tbl and tbl.selection else []
+    table_pick = view.iloc[rows]["gene"].tolist() if rows else []
+    shown = (table_pick or selected or view["gene"].head(1).tolist())[:MAX_GENES]
+    if not shown:
+        return
+    st.subheader("Per-cohort data" + ("" if (table_pick or selected) else f": {shown[0]} (top row)"))
     for gene in shown:
         r = meta.set_index("gene").loc[gene]
         st.markdown(f"**{gene}**: pooled r = {r['r']:.2f}, p = {r['p']:.2g}, FDR = {r['fdr']:.2g}"

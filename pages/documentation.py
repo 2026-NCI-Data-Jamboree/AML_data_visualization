@@ -29,7 +29,7 @@ thing everywhere in the portal.
 
 | page | what you can do |
 |---|---|
-| Highlights | genome-wide searches across patient cohorts: markers of drug response, and features that change with age |
+| Highlights | MYC-high vs mTOR-high gene dependency in cell lines; genome-wide searches across patient cohorts: markers of drug response, and features that change with age |
 | Cell lines | see which data each line has; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
 | Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; check one marker against one drug or against age; compare survival between groups |
 | Deconvolution | planned |

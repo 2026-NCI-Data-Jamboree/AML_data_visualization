@@ -157,7 +157,7 @@ def age_association(kp: str = "age") -> None:
                    "pooled Spearman r with age (positive = more sensitive in older patients)")
     else:
         x_title = (f"pooled rank effect, {A} vs {B} (positive = {pos})")
-    event = st.plotly_chart(plots.meta_volcano(meta, x_title, fdr=fdr, pos=pos, neg=neg), width="stretch",
+    event = st.plotly_chart(plots.meta_volcano(meta, x_title, fdr=fdr, pos=pos, neg=neg, y="fdr"), width="stretch",
                             on_select="rerun", selection_mode=("points", "box", "lasso"),
                             key=f"{kp}_volcano_{what}_{'-'.join(mode)}_{'-'.join(picked)}")
     selected = selected_genes(event)
@@ -166,29 +166,24 @@ def age_association(kp: str = "age") -> None:
         columns={**{f"r_{c}": f"r {names[c]}" for c in per},
                  "gene": "drug" if what == DRUG else ("site" if what == PHOS else "gene")})
     key_col = "drug" if what == DRUG else ("site" if what == PHOS else "gene")
-    if selected:
-        view = table[table[key_col].isin(selected)]
-    else:
-        q = st.text_input("Filter table", placeholder="e.g. venetoclax" if what == DRUG else "e.g. HOXA9, MECOM",
-                          key=f"{kp}_filter")
-        view = table if not q else table[table[key_col].str.contains(q, case=False, na=False, regex=False)]
-    st.dataframe(view, hide_index=True, width="stretch", height=min(320, 38 + 35 * len(view)),
-                 column_config={c: st.column_config.NumberColumn(format="%.3g") for c in view.columns
-                                if c in ("r", "p", "fdr", "I2") or c.startswith("r ")})
+    view = table[table[key_col].isin(selected)] if selected else table
+    tbl = st.dataframe(view, hide_index=True, width="stretch", height=min(320, 38 + 35 * len(view)),
+                       on_select="rerun", selection_mode="multi-row",
+                       key=f"{kp}_table_{what}_{'-'.join(mode)}_{'-'.join(picked)}_{len(view)}",
+                       column_config={c: st.column_config.NumberColumn(format="%.3g") for c in view.columns
+                                      if c in ("r", "p", "fdr", "I2") or c.startswith("r ")})
+    st.caption("Select rows in the table (tick boxes on the left) to show those features below; "
+               "otherwise the plot selection, or the top row, is shown.")
     st.download_button("Download table (TSV)", view.to_csv(sep="\t", index=False), key=f"{kp}_dl",
                        file_name=f"age_association_{what.lower().replace(' ', '_')}.tsv")
 
     inv = {v: k for k, v in labels.items()}
-    noun = {DRUG: "drug", PHOS: "site", PROT: "protein"}.get(what, "gene")
-    st.subheader("Per-cohort data")
-    options = meta["gene"].tolist()                              # ranked: strongest association first
-    default = [x for x in selected if x in options][:MAX_SHOWN] or options[:1]
-    shown = st.multiselect(
-        f"Show {noun}s", options, default=default, max_selections=MAX_SHOWN, key=f"{kp}_show_{what}_{'-'.join(mode)}_{'|'.join(default)}",
-        help=f"Type to search any {noun}. Starts with the {noun}s selected on the plot, or the top hit.")
+    rows = list(tbl.selection.rows) if tbl and tbl.selection else []
+    table_pick = view.iloc[rows][key_col].tolist() if rows else []
+    shown = (table_pick or selected or view[key_col].head(1).tolist())[:MAX_SHOWN]
     if not shown:
-        st.info(f"Pick a {noun} to see its data in each cohort.")
         return
+    st.subheader("Per-cohort data" + ("" if (table_pick or selected) else f": {shown[0]} (top row)"))
     for item in shown:
         r = meta.set_index("gene").loc[item]
         st.markdown(f"**{item}**: pooled r = {r['r']:.2f}, p = {r['p']:.2g}, FDR = {r['fdr']:.2g}"

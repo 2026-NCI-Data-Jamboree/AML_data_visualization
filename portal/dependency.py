@@ -40,7 +40,8 @@ def _corr(x: pd.Series, y: pd.Series) -> tuple[float, int]:
     return float(ok.iloc[:, 0].corr(ok.iloc[:, 1])), len(ok)
 
 
-def gene_dependency(kp: str = "dep") -> None:
+def gene_dependency(kp: str = "dep", fixed: str | None = None) -> None:
+    """fixed: a PRESETS comparison to show without the comparison menu (used by Highlights)."""
     dsets = data.datasets().set_index("key")
     if not {CRISPR, RNAI} <= set(dsets.index):
         st.info("This view needs both CRISPR and RNAi screens, which are not available.")
@@ -64,8 +65,17 @@ def gene_dependency(kp: str = "dep") -> None:
                if v[0] in G.index and {v[1], v[2]} <= set(cl[v[0]].dropna().astype(str))}
     options = [MEAN] + list(presets) + [CUSTOM]
     c1, c2 = st.columns([3, 2])
-    comparison = c1.selectbox("Comparison", options, key=f"{kp}_comparison",
-                              on_change=lambda: st.session_state.pop(f"{kp}_gene", None))
+    if fixed is not None:
+        if fixed not in presets:
+            st.info(f"{fixed} is not available in the processed cell-line data.")
+            return
+        comparison = fixed
+        g, a_lab, b_lab = presets[fixed]
+        n = cl[g].astype(str).value_counts()
+        c1.markdown(f"**{a_lab}** (n={n.get(a_lab, 0)}, blue) vs **{b_lab}** (n={n.get(b_lab, 0)}, red)")
+    else:
+        comparison = c1.selectbox("Comparison", options, key=f"{kp}_comparison",
+                                  on_change=lambda: st.session_state.pop(f"{kp}_gene", None))
     only_shared = c2.toggle(f"Only the {len(shared)} lines in both screens", key=f"{kp}_shared",
                             help="Off: each screen uses all its lines (CRISPR "
                                  f"{C_all.shape[1]}, RNAi {R_all.shape[1]}).")
@@ -119,7 +129,6 @@ def gene_dependency(kp: str = "dep") -> None:
         table = table.sort_values("mean_crispr")
         file_tag = "mean"
     else:
-        fdr = st.select_slider("FDR threshold", [0.05, 0.1, 0.25, 0.5], value=0.25, key=f"{kp}_fdr")
         grp_col = cl.set_index("cell_line")[grouping].astype("string")
         lines_a = grp_col.index[grp_col == ga].tolist()
         lines_b = (grp_col.index[grp_col.notna() & (grp_col != ga)] if gb == "all other lines"
@@ -135,33 +144,30 @@ def gene_dependency(kp: str = "dep") -> None:
         cols = ["feature", "n_A", "n_B", "diff_A_minus_B", "p_welch", "fdr_welch"]
         df = rc[cols].merge(rr[cols], on="feature", suffixes=("_crispr", "_rnai")).rename(
             columns={"feature": "gene", "diff_A_minus_B_crispr": "x", "diff_A_minus_B_rnai": "y"})
-        sc, sr = df["fdr_welch_crispr"] < fdr, df["fdr_welch_rnai"] < fdr
+        # colour by agreement in direction only (no significance threshold); lower = more dependent
         same = np.sign(df["x"]) == np.sign(df["y"])
-        favours_a = df["x"] + df["y"] < 0           # lower = more dependent, so negative favours A
-        df["cls"] = np.select(
-            [sc & sr & same & favours_a, sc & sr & same, (sc | sr) & favours_a, sc | sr],
-            ["A", "B", "a", "b"], "ns")
+        df["cls"] = np.select([same & (df["x"] < 0), same & (df["x"] > 0)], ["A", "B"], "ns")
         df["score"] = np.where(same, np.log10(df["p_welch_crispr"]) + np.log10(df["p_welch_rnai"]), 0)
-        style = {"ns": (plots.COL_NS, "n.s."), "b": (plots.TINT_B, f"{gb}, one screen"),
-                 "a": (plots.TINT_A, f"{ga}, one screen"), "B": (plots.COL_B, f"{gb}, both screens"),
-                 "A": (plots.COL_A, f"{ga}, both screens")}
-        r, n = _corr(df["x"], df["y"])
-        m1, m2, m3, m4 = st.columns(4)
+        style = {"ns": (plots.COL_NS, "screens disagree"), "B": (plots.COL_B, f"more dependent in {gb}, both screens"),
+                 "A": (plots.COL_A, f"more dependent in {ga}, both screens")}
+        m1, m2 = st.columns(2)
         m1.metric("Lines A / B (CRISPR · RNAi)", f"{int(df['n_A_crispr'].max())}/{int(df['n_B_crispr'].max())}"
                                                  f" · {int(df['n_A_rnai'].max())}/{int(df['n_B_rnai'].max())}")
-        m2.metric(f"More dependent in {ga}, both screens", int((df["cls"] == "A").sum()))
-        m3.metric(f"More dependent in {gb}, both screens", int((df["cls"] == "B").sum()))
-        m4.metric("Pearson r (differences)", f"{r:.2f}")
-        st.caption(f"Welch t test per screen, BH FDR per screen. 'Both screens' = FDR < {fdr} in each with "
-                   "the same direction. Negative difference = more dependent in group A.")
+        m2.metric("Genes compared", f"{len(df):,}")
+        st.caption("Welch t test per screen (p and FDR in the table). Colour = direction only: both screens agree "
+                   "the gene is more needed in group A (blue) or B (red). Negative difference = more dependent in "
+                   "group A. Labels: the strongest genes by combined p in the two screens.")
         x_title, y_title, thresholds = f"CRISPR: mean {ga} − mean {gb}", f"RNAi: mean {ga} − mean {gb}", None
-        table = df.drop(columns="score").rename(columns={"x": "diff_crispr", "y": "diff_rnai"})
+        table = df.rename(columns={"x": "diff_crispr", "y": "diff_rnai"})
+        table["agree"] = table["cls"] != "ns"
+        table = table.sort_values(["agree", "score"], ascending=[False, True])   # agreeing genes first, strongest first
         table["class"] = table.pop("cls").map({k: v[1] for k, v in style.items()})
-        table = table.sort_values("p_welch_crispr")
+        table = table.drop(columns=["score", "agree"])
 
     st.caption("Click a gene, or drag a box / lasso around several (toolbar, top right), to compare "
                "them line by line below. Double-click the plot to clear the selection.")
-    event = st.plotly_chart(plots.platform_scatter(df, x_title, y_title, style, thresholds=thresholds),
+    event = st.plotly_chart(plots.platform_scatter(df, x_title, y_title, style, thresholds=thresholds,
+                                                   no_count=("ns",) if grouping is not None else ()),
                             width="stretch", on_select="rerun", selection_mode=("points", "box", "lasso"),
                             key=f"{kp}_scatter_{file_tag}")
     selected = selected_genes(event)
@@ -170,11 +176,13 @@ def gene_dependency(kp: str = "dep") -> None:
         view = table[table["gene"].isin(selected)]
         st.markdown(f"**{len(selected)} selected gene{'s' if len(selected) > 1 else ''}**")
     else:
-        q = st.text_input("Filter table", placeholder="e.g. BCL2, MCL1, MTOR", key=f"{kp}_filter")
-        view = table if not q else table[table["gene"].str.contains(q, case=False, na=False, regex=False)]
-    st.dataframe(view, hide_index=True, width="stretch", height=min(320, 38 + 35 * len(view)),
-                 column_config={c: st.column_config.NumberColumn(format="%.3g") for c in view.columns
-                                if c.startswith(("mean_", "diff_", "p_", "fdr_"))})
+        view = table
+    tbl = st.dataframe(view, hide_index=True, width="stretch", height=min(320, 38 + 35 * len(view)),
+                       on_select="rerun", selection_mode="multi-row", key=f"{kp}_table_{file_tag}_{len(view)}",
+                       column_config={c: st.column_config.NumberColumn(format="%.3g") for c in view.columns
+                                      if c.startswith(("mean_", "diff_", "p_", "fdr_"))})
+    st.caption("Select rows in the table (tick boxes on the left) to plot those genes below; "
+               "otherwise the plot selection, or the top row, is shown.")
     st.download_button("Download table (TSV)", view.to_csv(sep="\t", index=False), key=f"{kp}_dl",
                        file_name=f"crispr_vs_rnai_{file_tag}.tsv")
 
@@ -189,10 +197,14 @@ def gene_dependency(kp: str = "dep") -> None:
         grp[lines_b], grp[lines_a] = gb, ga
         order = [ga, gb, "not compared"]
 
-    shown = selected[:MAX_GENES] if selected else df.nsmallest(1, "score")["gene"].tolist()
-    st.subheader("CRISPR vs RNAi per cell line" + ("" if selected else f": {shown[0]} (top gene)"))
-    if len(selected) > MAX_GENES:
-        st.caption(f"Showing the first {MAX_GENES} of {len(selected)} selected genes (strongest first).")
+    rows = list(tbl.selection.rows) if tbl and tbl.selection else []
+    picked = view.iloc[rows]["gene"].tolist() if rows else (selected or view["gene"].head(1).tolist())
+    if not picked:
+        return
+    shown = picked[:MAX_GENES]
+    st.subheader("CRISPR vs RNAi per cell line" + ("" if (rows or selected) else f": {shown[0]} (top row)"))
+    if len(picked) > MAX_GENES:
+        st.caption(f"Showing the first {MAX_GENES} of {len(picked)} chosen genes.")
     grid = st.columns(1 if len(shown) == 1 else 2)
     for i, gene in enumerate(shown):
         long = pd.DataFrame({"cell_line": shared, "x": C_all.loc[gene, shared].to_numpy(),

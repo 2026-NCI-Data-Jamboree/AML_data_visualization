@@ -25,8 +25,9 @@ c3.metric("AML cell lines", len(cl))
 
 st.subheader("What you can do")
 st.markdown(
-    "- **Highlights**: genome-wide searches across patient cohorts: RNA, protein or phosphosite markers of "
-    "drug response that replicate across cohorts *(built-in analysis 1)*, and features that change with age.\n"
+    "- **Highlights**: genes that MYC-high vs mTOR-high AML cell lines depend on (CRISPR and RNAi), RNA, "
+    "protein or phosphosite markers of drug response that replicate across patient cohorts *(built-in "
+    "analysis 1)*, and features that change with age.\n"
     "- **Cell lines**: 70 AML cell lines across 11 omics layers. See which data each line has, compare "
     "any two groups (mTOR/MYC-high, KMT2A-rearranged, TP53-mutant, ...) with volcano plots, and look "
     "up one gene across all layers *(built-in analysis 2, cell-line variability)*.\n"

@@ -55,7 +55,8 @@ def test_cell_line_feature_query_tab():
 def test_cell_line_gene_dependency_tab():
     from portal.dependency import CUSTOM, PRESETS
     at = AppTest.from_file(str(ROOT / "pages/cell_lines.py"), default_timeout=180).run()
-    at.text_input(key="dep_filter").set_value("BCL2").run()
+    assert not any(t.key == "dep_filter" for t in at.text_input)        # rows are chosen in the table instead
+    assert any("(top row)" in h.value for h in at.subheader)
     at.selectbox(key="dep_color").set_value("KMT2A_rearranged").run()
     assert not at.exception, at.exception
     for comparison in PRESETS:                                  # every featured comparison is testable
@@ -78,3 +79,13 @@ def test_selected_genes_from_plot_event():
     assert selected_genes({"selection": {"points": pts}}) == ["BCL2", "MCL1"]
     assert selected_genes({"selection": {"points": []}}) == []
     assert selected_genes(None) == []
+
+
+@needs_data
+def test_highlights_myc_mtor_dependency():
+    at = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=300).run()
+    assert not at.exception, at.exception
+    assert any("MYC-High / mTOR-Low" in m.value and "MYC-Low / mTOR-High" in m.value for m in at.markdown)
+    assert not any(s.key == "hl_dep_comparison" for s in at.selectbox)   # comparison is fixed
+    at.toggle(key="hl_dep_shared").set_value(True).run()
+    assert not at.exception, at.exception

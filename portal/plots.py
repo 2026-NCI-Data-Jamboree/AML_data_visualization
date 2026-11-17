@@ -128,7 +128,8 @@ def availability_heatmap(lines: list[str], tracks: list[dict], avail: pd.DataFra
 
 
 def platform_scatter(df: pd.DataFrame, x_title: str, y_title: str, style: dict[str, tuple[str, str]],
-                     n_label: int = 12, zero_lines: tuple = (0, 0), thresholds: tuple | None = None) -> go.Figure:
+                     n_label: int = 12, zero_lines: tuple = (0, 0), thresholds: tuple | None = None,
+                     no_count: tuple = ()) -> go.Figure:
     """Gene-level CRISPR vs RNAi scatter. df: gene, x, y, cls, score (lowest = labelled first).
     style: cls -> (colour, legend name), drawn in the given order (last on top).
     customdata = gene symbol, so a Streamlit selection returns the genes picked."""
@@ -138,7 +139,7 @@ def platform_scatter(df: pd.DataFrame, x_title: str, y_title: str, style: dict[s
         if s.empty:
             continue
         fig.add_trace(go.Scattergl(
-            x=s["x"], y=s["y"], mode="markers", name=f"{name} ({len(s):,})",
+            x=s["x"], y=s["y"], mode="markers", name=name if cls in no_count else f"{name} ({len(s):,})",
             marker=dict(color=col, size=4 if cls == "ns" else 6, line=dict(width=0)),
             customdata=s["gene"], selected=dict(marker=dict(size=10)),
             hovertemplate="<b>%{customdata}</b><br>CRISPR %{x:.3f}<br>RNAi %{y:.3f}<extra></extra>"))
@@ -210,11 +211,11 @@ def kaplan_meier(curves: dict[str, pd.DataFrame], colors: dict[str, str], x_titl
 
 
 def meta_volcano(df: pd.DataFrame, x_title: str, fdr: float = 0.05, n_label: int = 12,
-                 pos: str = "sensitivity", neg: str = "resistance") -> go.Figure:
+                 pos: str = "sensitivity", neg: str = "resistance", y: str = "p") -> go.Figure:
     """df: gene, r (pooled), p, fdr, concordant (bool). Positive r = associated with sensitivity.
     customdata = gene, so a Streamlit selection returns the genes picked."""
-    d = df[np.isfinite(df["p"])].copy()
-    d["y"] = -np.log10(d["p"].clip(lower=1e-300))
+    d = df[np.isfinite(df[y])].copy()
+    d["y"] = -np.log10(d[y].clip(lower=1e-300))
     sig = d["fdr"] < fdr
     d["cls"] = np.where(sig & d["concordant"], np.where(d["r"] > 0, "S", "R"),
                         np.where(sig, "mixed", "ns"))
@@ -229,7 +230,8 @@ def meta_volcano(df: pd.DataFrame, x_title: str, fdr: float = 0.05, n_label: int
             x=s["r"], y=s["y"], mode="markers", name=f"{name} ({len(s):,})", customdata=s["gene"],
             marker=dict(color=col, size=4 if cls == "ns" else 6, line=dict(width=0)),
             selected=dict(marker=dict(size=10)),
-            hovertemplate="<b>%{customdata}</b><br>pooled r %{x:.3f}<br>−log10 p %{y:.1f}<extra></extra>"))
+            hovertemplate="<b>%{customdata}</b><br>pooled r %{x:.3f}<br>−log10 " + ("FDR" if y == "fdr" else "p")
+                          + " %{y:.1f}<extra></extra>"))
     top = pd.concat([d[d["r"] > 0].nsmallest(n_label // 2, "p"), d[d["r"] < 0].nsmallest(n_label // 2, "p")])
     for i, (_, t) in enumerate(top.sort_values("y", ascending=False).iterrows()):   # top hits of each direction
         fig.add_annotation(x=t["r"], y=t["y"], text=t["gene"], showarrow=True, arrowhead=0, arrowwidth=0.6,
@@ -238,7 +240,10 @@ def meta_volcano(df: pd.DataFrame, x_title: str, fdr: float = 0.05, n_label: int
     fig.add_vline(x=0, line_width=1, line_color="#52514e")
     fig.update_xaxes(automargin=True)
     fig.update_yaxes(automargin=True)
-    fig.update_layout(xaxis_title=x_title, yaxis_title="−log10 p (meta-analysis)", height=520,
+    if y == "fdr":                                                   # significance threshold
+        fig.add_hline(y=-np.log10(fdr), line_width=1, line_dash="dot", line_color="#52514e")
+    fig.update_layout(xaxis_title=x_title, yaxis_title="−log10 " + ("FDR" if y == "fdr" else "p") + " (meta-analysis)",
+                      height=520,
                       dragmode="select", clickmode="event+select",
                       margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=-0.15))
     return fig

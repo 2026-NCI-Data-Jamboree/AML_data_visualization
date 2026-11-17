@@ -66,7 +66,8 @@ def test_drug_biomarkers_tab():
     assert at.selectbox(key="age_what").value == "Protein"
     at.selectbox(key="db_layer").set_value("expression").run()
     assert at.selectbox(key="db_drug_expression").value == "VENETOCLAX"
-    assert any("**MAP1A**" in m.value for m in at.markdown)          # proof-of-concept default
+    assert any("(top row)" in h.value for h in at.subheader)          # no selection: top row drives the plots
+    assert not any(t.key == "db_filter" for t in at.text_input)        # no table search box
     for drug in ["QUIZARTINIB", "CYTARABINE", "TRAMETINIB"]:
         if drug in at.selectbox(key="db_drug_expression").options:
             at.selectbox(key="db_drug_expression").set_value(drug).run()
@@ -75,8 +76,6 @@ def test_drug_biomarkers_tab():
     assert not at.exception, at.exception
     at.selectbox(key="db_drug_expression").set_value("VENETOCLAX").run()
     at.radio(key="db_measure_MALANI_2022").set_value("drug_DSS").run()
-    assert not at.exception, at.exception
-    at.text_input(key="db_filter").set_value("BCL2").run()
     assert not at.exception, at.exception
 
 
@@ -141,19 +140,15 @@ def test_age_association_tab():
     t = [d.value for d in at.dataframe if "concordant" in d.value.columns and "gene" in d.value.columns][-1]
     lrrn3 = t.set_index("gene").loc["LRRN3"]                    # known to fall with age in blood
     assert lrrn3["r"] < 0 and lrrn3["fdr"] < 1e-6
-    show = [m for m in at.multiselect if m.label == "Show genes"][0]
-    assert show.value == [t["gene"].iloc[0]]                            # top hit by default
-    show.set_value(["MYH11", "HOXA9"]).run()
-    assert not at.exception, at.exception
-    assert any(m.value.startswith("**HOXA9**") for m in at.markdown)
+    top = t["gene"].iloc[0]
+    assert any(h.value == f"Per-cohort data: {top} (top row)" for h in at.subheader)   # top row by default
+    assert not any(x.key == "age_filter" for x in at.text_input)       # no table search box
+    assert not any(m.label.startswith("Show ") for m in at.multiselect)
     at.selectbox(key="age_what").set_value("Drug response").run()
     assert not at.exception, at.exception
-    [m for m in at.multiselect if m.label == "Show drugs"][0].set_value(["Venetoclax"]).run()
-    assert any(m.value.startswith("**Venetoclax**") for m in at.markdown)
     at.multiselect(key="age_cohorts").set_value(["BEAT_AML", "WANG_2022_PED"]).run()
     assert not at.exception, at.exception
     at.selectbox(key="age_what").set_value("Gene expression").run()
-    at.text_input(key="age_filter").set_value("HOXA").run()
     assert not at.exception, at.exception
     at.multiselect(key="age_cohorts").set_value(["BEAT_AML", "LEE_2018", "MALANI_2022", "WANG_2022_PED"]).run()
     at.radio(key="age_how").set_value("Age groups").run()
