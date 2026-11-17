@@ -183,8 +183,9 @@ def line_scatter(df: pd.DataFrame, group_col: str, order: list[str], x_title: st
 
 
 def kaplan_meier(curves: dict[str, pd.DataFrame], colors: dict[str, str], x_title: str,
-                 ci: bool = True) -> go.Figure:
-    """curves: group -> survival.kaplan_meier() table. Steps, optional 95% CI band, + = censored."""
+                 ci: bool = True, dashes: dict[str, str] | None = None) -> go.Figure:
+    """curves: group -> survival.kaplan_meier() table. Steps, optional 95% CI band, + = censored.
+    dashes: optional group -> plotly dash style (e.g. "dash") for the curve."""
     fig = go.Figure()
     for g, km in curves.items():
         col = colors[g]
@@ -196,7 +197,8 @@ def kaplan_meier(curves: dict[str, pd.DataFrame], colors: dict[str, str], x_titl
                                      showlegend=False, legendgroup=g))
         fig.add_trace(go.Scatter(
             x=km["time"], y=km["surv"], mode="lines", name=g, legendgroup=g,
-            line=dict(color=col, width=2.5, shape="hv"), customdata=km[["n_risk"]],
+            line=dict(color=col, width=2.5, shape="hv", dash=(dashes or {}).get(g, "solid")),
+            customdata=km[["n_risk"]],
             hovertemplate=f"<b>{g}</b><br>%{{x:.1f}}: %{{y:.1%}} survival<br>%{{customdata[0]}} at risk"
                           "<extra></extra>"))
         cens = km[km["n_censor"] > 0]
@@ -211,7 +213,8 @@ def kaplan_meier(curves: dict[str, pd.DataFrame], colors: dict[str, str], x_titl
 
 
 def meta_volcano(df: pd.DataFrame, x_title: str, fdr: float = 0.05, n_label: int = 12,
-                 pos: str = "sensitivity", neg: str = "resistance", y: str = "p") -> go.Figure:
+                 pos: str = "sensitivity", neg: str = "resistance", y: str = "p",
+                 x_label: str = "pooled r") -> go.Figure:
     """df: gene, r (pooled), p, fdr, concordant (bool). Positive r = associated with sensitivity.
     customdata = gene, so a Streamlit selection returns the genes picked."""
     d = df[np.isfinite(df[y])].copy()
@@ -230,7 +233,7 @@ def meta_volcano(df: pd.DataFrame, x_title: str, fdr: float = 0.05, n_label: int
             x=s["r"], y=s["y"], mode="markers", name=f"{name} ({len(s):,})", customdata=s["gene"],
             marker=dict(color=col, size=4 if cls == "ns" else 6, line=dict(width=0)),
             selected=dict(marker=dict(size=10)),
-            hovertemplate="<b>%{customdata}</b><br>pooled r %{x:.3f}<br>−log10 " + ("FDR" if y == "fdr" else "p")
+            hovertemplate="<b>%{customdata}</b><br>" + x_label + " %{x:.3f}<br>−log10 " + ("FDR" if y == "fdr" else "p")
                           + " %{y:.1f}<extra></extra>"))
     top = pd.concat([d[d["r"] > 0].nsmallest(n_label // 2, "p"), d[d["r"] < 0].nsmallest(n_label // 2, "p")])
     for i, (_, t) in enumerate(top.sort_values("y", ascending=False).iterrows()):   # top hits of each direction
@@ -344,4 +347,32 @@ def frequency_heatmap(n_mut: pd.DataFrame, n_tested: pd.DataFrame) -> go.Figure:
     fig.update_xaxes(side="top", automargin=True, tickangle=-45)
     fig.update_layout(height=120 + 45 * len(frac), margin=dict(l=10, r=10, t=10, b=10),
                       plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+    return fig
+
+
+def forest(rows: pd.DataFrame, pooled: dict, x_title: str = "Hazard ratio per SD (log scale)") -> go.Figure:
+    """rows: label, hr, lo, hi, n, events (one per cohort); pooled: same keys. Squares sized by weight."""
+    d = rows.iloc[::-1].reset_index(drop=True)                    # first cohort at the top
+    labels = list(d["label"])
+    fig = go.Figure()
+    w = 1 / ((np.log(d["hi"]) - np.log(d["lo"])) / 3.92) ** 2
+    size = 8 + 14 * np.sqrt(w / w.max())
+    fig.add_trace(go.Scatter(
+        x=d["hr"], y=d["label"], mode="markers", marker=dict(symbol="square", size=size, color=COL_A),
+        error_x=dict(type="data", symmetric=False, array=d["hi"] - d["hr"], arrayminus=d["hr"] - d["lo"],
+                     color=COL_A, thickness=1.5, width=0),
+        customdata=d[["n", "events", "lo", "hi"]],
+        hovertemplate="<b>%{y}</b><br>HR %{x:.2f} (95% CI %{customdata[2]:.2f}–%{customdata[3]:.2f})"
+                      "<br>n=%{customdata[0]}, events=%{customdata[1]}<extra></extra>", showlegend=False))
+    lab = "Pooled"
+    fig.add_trace(go.Scatter(
+        x=[pooled["hr"]], y=[lab], mode="markers", marker=dict(symbol="diamond", size=18, color=COL_B),
+        error_x=dict(type="data", symmetric=False, array=[pooled["hi"] - pooled["hr"]],
+                     arrayminus=[pooled["hr"] - pooled["lo"]], color=COL_B, thickness=2.5, width=0),
+        hovertemplate=f"<b>Pooled</b><br>HR {pooled['hr']:.2f} (95% CI {pooled['lo']:.2f}–{pooled['hi']:.2f})"
+                      "<extra></extra>", showlegend=False))
+    fig.add_vline(x=1, line_width=1, line_dash="dot", line_color="#52514e")
+    fig.update_xaxes(type="log", title=x_title, automargin=True)
+    fig.update_yaxes(categoryorder="array", categoryarray=[lab] + labels, automargin=True)
+    fig.update_layout(height=90 + 38 * (len(d) + 1), margin=dict(l=10, r=10, t=10, b=10))
     return fig

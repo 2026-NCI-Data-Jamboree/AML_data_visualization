@@ -29,7 +29,7 @@ thing everywhere in the portal.
 
 | page | what you can do |
 |---|---|
-| Highlights | MYC-high vs mTOR-high gene dependency in cell lines; genome-wide searches across patient cohorts: markers of drug response, and features that change with age |
+| Highlights | MYC-high vs mTOR-high gene dependency in cell lines; genome-wide searches across patient cohorts: markers of drug response, features that change with age, and genes linked to survival |
 | Cell lines | see which data each line has; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
 | Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; check one marker against one drug or against age; compare survival between groups |
 | Deconvolution | planned |
@@ -138,6 +138,19 @@ with tab_methods:
   available for Beat AML (also used for its PTRC proteomics samples), the Zenodo proteogenomics cohort, the
   FPM tumor board, TCGA and TARGET; event-free survival for the Zenodo cohort, the FPM tumor board and
   Wang 2022. Lee 2018 reports survival times without whether the patient died, so it is not included.
+- **Survival across cohorts** (Highlights): in each cohort, every gene's RNA level (or protein, or
+  phosphosite) is related to survival with a Cox regression, one sample per patient. Each feature is
+  standardized within the cohort, so the hazard ratio is per standard deviation: above 1 = higher level,
+  shorter survival. Cohorts need at least 20 patients and 10 events. For RNA, a gene is tested only where it
+  is expressed (log2 level of at least 1) in at least 20% of patients, because barely expressed genes give
+  unstable results. Cohorts are combined by inverse-variance meta-analysis of the log hazard ratios, and
+  p values are adjusted for the number of features tested (FDR). The Kaplan–Meier curves below the table
+  split each cohort at its median, for display only. **Risk group** can be taken into account in two ways,
+  using only cohorts that report one (ELN or cytogenetic risk): *adjusted for risk group* compares patients
+  within the same risk group (a Cox model stratified by risk group), so it shows whether a gene adds to
+  the risk classification, and its Kaplan–Meier curves show high vs low within each risk group (split at the
+  median of that risk group), with a log-rank test per risk group; *within one risk group* analyses
+  favorable, intermediate or adverse patients only.
 """
     )
     st.subheader("Things to keep in mind")
