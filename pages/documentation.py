@@ -157,9 +157,9 @@ with tab_methods:
     st.markdown(
         """
 Deconvolution estimates how much of each cell type or state is in a bulk RNA sample, using a single-cell AML
-reference (AML scAtlas, bone marrow at diagnosis). It runs offline in the processing step, once per cohort
-(Wang 2022, Malani 2022, St. Jude 2024, Beat AML and four AMLmap studies: Leucegene, TCGA, TARGET, LUMC), with InstaPrism (an initial fit and
-a fit that updates the reference to the cohort) and NNLS. The portal only displays the results.
+reference (AML scAtlas, bone marrow at diagnosis), once per cohort (Wang 2022, Malani 2022, St. Jude 2024, Beat AML
+and four AMLmap studies: Leucegene, TCGA, TARGET, LUMC), with InstaPrism (an initial fit and a fit that updates the
+reference to the cohort) and NNLS.
 
 - **Which data can be used.** Raw read counts, or counts per million (CPM). Data normalized by transcript length (TPM,
   RPKM, FPKM) is never used: the reference is built from single-cell counts, which are not biased by gene length, and
