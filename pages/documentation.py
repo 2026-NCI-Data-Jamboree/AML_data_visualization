@@ -95,6 +95,8 @@ with tab_methods:
 - **Risk group** (favorable / intermediate / adverse) uses what each cohort reports: ELN 2017 (Beat AML,
   FPM tumor board), ELN 2010 cytogenetic risk (Lee 2018) or cytogenetic risk (Wang 2022).
   St. Jude pediatric AML has no risk group; it has a molecular category (e.g. KMT2A-r, RUNX1::RUNX1T1, NUP98-r) instead.
+  TCGA, TARGET, Leucegene and LUMC (from the AMLmap compendium) have no risk group; they have WHO 2022 and ICC 2022
+  classes and the AMLmap transcriptomic cluster instead.
 - **Age groups** follow the NCI bands: pediatric under 15, adolescent and young adult (AYA) 15–39,
   adult 40 and over, from age at diagnosis.
 - **MYC and mTOR RNA signatures**: a score per sample, the average of the signature genes after
@@ -133,7 +135,8 @@ with tab_methods:
 - **Survival** (Patients): Kaplan–Meier curves with 95% confidence bands, compared with the log-rank
   test. The hazard ratio compares the first group with the second (above 1 = worse outcome in the first
   group). Each patient counts once, using the diagnosis sample when there is one. Overall survival is
-  available for Beat AML and the FPM tumor board; event-free survival for the FPM tumor board and
+  available for Beat AML (also used for its PTRC proteomics samples), the Zenodo proteogenomics cohort, the
+  FPM tumor board, TCGA and TARGET; event-free survival for the Zenodo cohort, the FPM tumor board and
   Wang 2022. Lee 2018 reports survival times without whether the patient died, so it is not included.
 """
     )
