@@ -100,3 +100,31 @@ def test_downloads_shows_data_readme():
     assert not at.exception, at.exception
     assert at.tabs[0].label == "About the data"
     assert any("Folder layout" in m.value for m in at.markdown)
+
+
+@needs_data
+def test_highlights_survival_tab():
+    at = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=600).run()
+    assert not at.exception, at.exception
+    assert any(t.label == "Survival" for t in at.tabs)
+    assert at.selectbox(key="sv_risk").value == "Adjusted for risk group"         # the default
+    tables = [d.value for d in at.dataframe if "HR per SD" in d.value.columns]
+    assert tables and len(tables[0]) > 1000
+    top = tables[0].iloc[0]
+    assert top["fdr"] < 0.05 and top["n_cohorts"] >= 3
+    by_risk = [d.value for d in at.dataframe if "risk group" in d.value.columns]    # per-cohort, per-risk-group
+    assert by_risk and set(by_risk[0]["risk group"]) <= {"favorable", "intermediate", "adverse"}
+    for what in ["Protein", "Phosphosite"]:
+        at.selectbox(key="sv_what").set_value(what).run()
+        assert not at.exception, (what, at.exception)
+    at.selectbox(key="sv_endpoint").set_value("Event-free survival").run()
+    assert not at.exception, at.exception
+    at.selectbox(key="sv_what").set_value("Gene expression").run()
+    at.selectbox(key="sv_endpoint").set_value("Overall survival").run()
+    at.selectbox(key="sv_risk").set_value("Not used").run()
+    assert not at.exception, at.exception
+    plain = [d.value for d in at.dataframe if "HR per SD" in d.value.columns][0]
+    assert plain["n_cohorts"].max() > tables[0]["n_cohorts"].max()     # cohorts without risk group come back
+    at.selectbox(key="sv_risk").set_value("Within one risk group").run()
+    at.selectbox(key="sv_risk_level").set_value("favorable").run()
+    assert not at.exception, at.exception

@@ -137,7 +137,7 @@ def test_age_association_tab():
     at = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=300).run()
     assert not at.exception, at.exception
     at.selectbox(key="age_what").set_value("Gene expression").run()
-    t = [d.value for d in at.dataframe if "concordant" in d.value.columns and "gene" in d.value.columns][-1]
+    t = [d.value for d in at.dataframe if {"concordant", "gene", "r"} <= set(d.value.columns)][-1]
     lrrn3 = t.set_index("gene").loc["LRRN3"]                    # known to fall with age in blood
     assert lrrn3["r"] < 0 and lrrn3["fdr"] < 1e-6
     top = t["gene"].iloc[0]

@@ -3,10 +3,12 @@ import streamlit as st
 from portal.age_association import age_association
 from portal.dependency import gene_dependency
 from portal.drug_biomarkers import drug_biomarkers
+from portal.survival_meta import survival_association
 
 st.title("Highlights")
 
-tab_dep, tab_drug, tab_age = st.tabs(["MYC-high vs mTOR-high dependency", "Drug response markers", "Age association"])
+tab_dep, tab_drug, tab_age, tab_surv = st.tabs(
+    ["MYC-high vs mTOR-high dependency", "Drug response markers", "Age association", "Survival"])
 
 with tab_dep:
     st.caption("Built-in analysis 2 · AML cell lines: which genes MYC-high and mTOR-high lines depend on, "
@@ -19,3 +21,6 @@ with tab_drug:
 
 with tab_age:
     age_association()
+
+with tab_surv:
+    survival_association()
