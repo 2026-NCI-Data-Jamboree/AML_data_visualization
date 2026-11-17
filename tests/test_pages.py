@@ -89,3 +89,14 @@ def test_highlights_myc_mtor_dependency():
     assert not any(s.key == "hl_dep_comparison" for s in at.selectbox)   # comparison is fixed
     at.toggle(key="hl_dep_shared").set_value(True).run()
     assert not at.exception, at.exception
+
+
+@needs_data
+def test_downloads_shows_data_readme():
+    from portal import data
+    if not data.results_readme():
+        pytest.skip("results/README.md not prepared")
+    at = AppTest.from_file(str(ROOT / "pages/downloads.py"), default_timeout=180).run()
+    assert not at.exception, at.exception
+    assert at.tabs[0].label == "About the data"
+    assert any("Folder layout" in m.value for m in at.markdown)

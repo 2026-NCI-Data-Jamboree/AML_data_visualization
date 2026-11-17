@@ -5,7 +5,6 @@ from portal.dependency import gene_dependency
 from portal.drug_biomarkers import drug_biomarkers
 
 st.title("Highlights")
-st.caption("Genome-wide analyses across the cell lines and patient cohorts")
 
 tab_dep, tab_drug, tab_age = st.tabs(["MYC-high vs mTOR-high dependency", "Drug response markers", "Age association"])
 

@@ -55,28 +55,22 @@ with tab_sources:
     if src.empty:
         st.info("The list of data sources is not available.")
     else:
-        c1, c2, c3 = st.columns(3)
+        c1, c3 = st.columns(2)
         c1.metric("Datasets", len(src))
-        c2.metric("In the portal now", int((src["status"] == "processed").sum()))
         c3.metric("From NCI resources", int(src["nci_resource"].isin(["yes", "partly"]).sum()),
                   help="Fully or partly from an NCI program or data commons (GDC, PDC, CPTAC, TCGA, TARGET, CTD²)")
-        f1, f2 = st.columns(2)
-        status = f1.multiselect("Status", sorted(src["status"].unique()), key="doc_status")
-        nci = f2.multiselect("NCI resource", ["yes", "partly", "no"], key="doc_nci")
+        nci = st.multiselect("NCI resource", ["yes", "partly", "no"], key="doc_nci")
         view = src
-        if status:
-            view = view[view["status"].isin(status)]
         if nci:
             view = view[view["nci_resource"].isin(nci)]
         show = ["name", "category", "population", "data_types", "reference", "source", "accession",
-                "nci_resource", "nci_program", "status"]
+                "nci_resource", "nci_program"]
         st.dataframe(view[[c for c in show if c in view]], hide_index=True, width="stretch",
                      column_config={"nci_resource": st.column_config.TextColumn("NCI resource"),
                                     "nci_program": st.column_config.TextColumn("NCI program / commons"),
                                     "data_types": st.column_config.TextColumn("data types")})
         st.download_button("Download list (TSV)", view.to_csv(sep="\t", index=False), file_name="dataset_sources.tsv")
-        st.caption("Status: processed = in the portal now; downloaded = obtained, not yet in the portal; "
-                   "proposed = planned. NCI resource: GDC = Genomic Data Commons, PDC = Proteomic Data Commons, "
+        st.caption("The datasets integrated into the portal. NCI resource: GDC = Genomic Data Commons, PDC = Proteomic Data Commons, "
                    "CTD² = Cancer Target Discovery and Development Network. A blank accession is still to be confirmed.")
 
 with tab_methods:
@@ -88,8 +82,9 @@ with tab_methods:
   specimens: for these, clinical data and drug response come from the matching Beat AML sample, and RNA
   is only in the Beat AML cohort, so no patient is counted twice in an analysis. CPTAC adult AML values
   are corrected for red-blood-cell contamination.
-- **Genes** use HGNC symbols. Patient RNA data keeps protein-coding genes; where a gene has several
-  measurements (e.g. array probes) they are averaged.
+- **Genes** use current HGNC symbols. Cohorts that use older gene names are updated to the current name
+  (e.g. HDGFRP3 → HDGFL3), so a gene can be found under one name everywhere. Patient RNA data keeps
+  protein-coding genes; where a gene has several measurements (e.g. array probes) they are averaged.
 - **Mutations** are recorded for 20 genes recurrently mutated in AML (TP53, FLT3, NPM1, NRAS, KRAS, PTPN11,
   KIT, IDH1, IDH2, DNMT3A, TET2, ASXL1, RUNX1, CEBPA, WT1, SRSF2, U2AF1, SF3B1, STAG2, BCOR). A gene is
   marked *not tested* when a cohort did not assay it, which is different from *not mutated*.
@@ -99,6 +94,7 @@ with tab_methods:
   (patients).
 - **Risk group** (favorable / intermediate / adverse) uses what each cohort reports: ELN 2017 (Beat AML,
   FPM tumor board), ELN 2010 cytogenetic risk (Lee 2018) or cytogenetic risk (Wang 2022).
+  St. Jude pediatric AML has no risk group; it has a molecular category (e.g. KMT2A-r, RUNX1::RUNX1T1, NUP98-r) instead.
 - **Age groups** follow the NCI bands: pediatric under 15, adolescent and young adult (AYA) 15–39,
   adult 40 and over, from age at diagnosis.
 - **MYC and mTOR RNA signatures**: a score per sample, the average of the signature genes after
@@ -131,8 +127,9 @@ with tab_methods:
   at diagnosis, one sample per patient, either as **continuous age** (Spearman correlation with age in
   years; at least 10 patients) or between two **age groups** (e.g. AYA vs adult; a rank comparison of the
   two groups, at least 3 patients in each). Cohorts are combined as in the drug response analysis.
-  Positive = higher in older patients, or in group A (for drugs: more sensitive). The pediatric cohort
-  adds the youngest patients; it has no adults, so it is not used when the comparison needs them.
+  Positive = higher in older patients, or in group A (for drugs: more sensitive). The pediatric cohorts
+  (Wang 2022, St. Jude) add the youngest patients; they have no adults, so they are not used when the
+  comparison needs them.
 - **Survival** (Patients): Kaplan–Meier curves with 95% confidence bands, compared with the log-rank
   test. The hazard ratio compares the first group with the second (above 1 = worse outcome in the first
   group). Each patient counts once, using the diagnosis sample when there is one. Overall survival is

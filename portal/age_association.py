@@ -79,7 +79,7 @@ def age_association(kp: str = "age") -> None:
     st.markdown(
         "Which genes, or responses to which drugs, change with age at diagnosis? Each cohort correlates every "
         "feature with age (Spearman, one sample per patient), and the cohorts are combined by meta-analysis. "
-        "The pediatric cohort (Wang 2022) adds the youngest patients; the others are mostly adults.")
+        "The pediatric cohorts (Wang 2022, St. Jude) add the youngest patients; the others are mostly adults.")
 
     c1, c2, c3 = st.columns([2, 2, 3])
     what = c1.selectbox("Features", [EXPR, PROT, PHOS, DRUG], index=1, key=f"{kp}_what")

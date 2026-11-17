@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 
 from portal import data
@@ -6,18 +7,24 @@ st.title("Downloads")
 st.markdown("The list of datasets, the shared annotation vocabulary, and every processed data file "
             "behind the portal.")
 
-tab_datasets, tab_files, tab_pfiles, tab_schema = st.tabs(
-    ["Datasets", "Cell-line files", "Patient files", "Annotation schema"])
+tab_readme, tab_datasets, tab_files, tab_pfiles, tab_schema = st.tabs(
+    ["About the data", "Datasets", "Cell-line files", "Patient files", "Annotation schema"])
+
+with tab_readme:
+    readme = data.results_readme()
+    if readme:
+        st.download_button("Download README (Markdown)", readme, file_name="README.md")
+        with st.container(border=True):
+            st.markdown(readme.split("\n", 1)[1] if readme.startswith("# ") else readme)   # page has its own title
+    else:
+        st.info("The description of the harmonized data is not available.")
 
 with tab_datasets:
-    cat = data.catalog()
-    c1, c2, c3 = st.columns(3)
-    status = c1.multiselect("Status", sorted(cat["status"].unique()))
+    cat = data.catalog().drop(columns=["status", "used_by"], errors="ignore")
+    c2, c3 = st.columns(2)
     stype = c2.multiselect("Sample type", sorted({t for v in cat["sample_type"] for t in v.split(";") if t}))
     modality = c3.multiselect("Modality", sorted({m for v in cat["modalities"] for m in v.split(";") if m}))
     view = cat
-    if status:
-        view = view[view["status"].isin(status)]
     if stype:
         view = view[view["sample_type"].apply(lambda v: any(t in v.split(";") for t in stype))]
     if modality:
@@ -29,8 +36,8 @@ with tab_datasets:
     st.subheader("Modality coverage")
     long = cat.assign(modality=cat["modalities"].str.split(";")).explode("modality")
     long = long[long["modality"] != ""]
-    st.dataframe(long.pivot_table(index="dataset_id", columns="modality", values="status",
-                                  aggfunc="first").fillna(""), width="stretch")
+    cov = pd.crosstab(long["dataset_id"], long["modality"]).gt(0)
+    st.dataframe(cov.replace({True: "✓", False: ""}), width="stretch")
 
 with tab_files:
     man = data.manifest()

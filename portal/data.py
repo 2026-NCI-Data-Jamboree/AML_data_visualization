@@ -286,7 +286,7 @@ def patient_manifest(cohort: str) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def dataset_sources() -> pd.DataFrame:
-    """results/dataset_sources.tsv: every dataset used or proposed, with source and NCI resource status."""
+    """results/dataset_sources.tsv: every integrated dataset, with source and NCI resource status."""
     p = results_dir()
     f = p / "dataset_sources.tsv" if p else None
     return _read(f, dtype=str).fillna("") if f is not None and f.exists() else pd.DataFrame()
@@ -306,3 +306,10 @@ def feature_names(cohort: str, layer: str) -> pd.Series:
     if "site" in f or "gene_symbol" not in f:
         return f["label"]
     return f["gene_symbol"].where(f["gene_symbol"] != "", f["label"])
+
+
+def results_readme() -> str:
+    """results/README.md: overview of the harmonized data ('' if missing)."""
+    p = results_dir()
+    f = p / "README.md" if p else None
+    return f.read_text() if f is not None and f.exists() else ""
