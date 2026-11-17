@@ -1,0 +1,22 @@
+[project]
+name = "aml-data-visualization"
+version = "0.1.0"
+description = "Streamlit portal for the harmonized AML multi-omics resource (data jamboree)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.40",
+    # pandas 3 makes DataFrame arrays read-only; portal/stats.py spearman_rows modifies one in place
+    "pandas>=2.0,<3",
+    "plotly>=5.20",
+    "scipy>=1.10",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.uv]
+# an app, not a library: install the dependencies but don't build or install this project
+package = false
