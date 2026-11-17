@@ -21,16 +21,47 @@ METHOD_LABEL = {
     "nnls": "NNLS",
 }
 LEVEL_LABEL = {"cell_type": "Cell type", "cell_state": "Cell state"}
-QUANTITY_LABEL = {"mrna_share": "mRNA share", "cell_share": "cell share"}
+QUANTITY_LABEL = {"mrna_share": "shares of the sample's mRNA", "cell_share": "shares of the sample's cells"}
 SEVERITY_RANK = {"info": 1, "warning": 2, "caution": 3}
 SEVERITY_COLOR = {"info": "#4c8bd4", "warning": "#e69f00", "caution": "#d1362f"}
 PALETTE = ["#4e79a7", "#f28e2b", "#59a14f", "#b07aa1", "#76b7b2", "#edc948", "#9c755f", "#bab0ac", "#86bcb6",
            "#d4a6c8", "#8cd17d", "#a0cbe8", "#ffbe7d", "#b6992d", "#499894", "#d37295", "#79706e", "#fabfd2",
            "#d62728", "#ff9896", "#17becf", "#9edae5", "#bcbd22", "#c5b0d5"]
 MALIGNANT = "Malignant"
+# malignant cell states from most primitive to most differentiated; unknown malignant labels follow, alphabetically
+MALIGNANT_STATE_ORDER = ["LSC", "HSC-like", "Prog-like", "GMP-like", "ProMono-like", "Mono-like", "cDC-like"]
+MALIGNANT_COLORS = ["#67000d", "#a50f15", "#cb181d", "#ef3b2c", "#fb6a4a", "#fc9272", "#fcbba1", "#fee0d2"]
+NORMAL_PALETTE = [c for c in PALETTE if c not in ("#d62728", "#ff9896", "#d37295", "#fabfd2")]
+LEGEND_BELOW = dict(orientation="h", yanchor="top", y=-0.08, x=0, xanchor="left", title_text="")
 
 
 # ------------------------------------------------------------------------------------------ helpers
+def malignant_labels(reference: str, level: str, labels) -> list[str]:
+    """Labels of the layer that are malignant in the reference, most primitive first."""
+    try:
+        table = data.reference_table(reference)
+        flagged = set(table.loc[(table["level"] == level) & table["is_malignant"], "label"])
+    except (FileNotFoundError, KeyError, TypeError):
+        flagged = {MALIGNANT}
+    found = [label for label in labels if label in flagged or label == MALIGNANT]
+    rank = {label: i for i, label in enumerate(MALIGNANT_STATE_ORDER)}
+    return sorted(found, key=lambda label: (rank.get(label, len(rank)), label))
+
+
+def stack_order(labels, malignant: list[str]) -> list[str]:
+    """Normal labels first (bottom of a stacked bar), then the malignant ones, most primitive on top."""
+    return [label for label in sorted(labels) if label not in malignant] + list(reversed(malignant))
+
+
+def label_colors(order: list[str], malignant: list[str]) -> dict[str, str]:
+    """Reds for malignant labels (darkest = most primitive), the general palette for the rest."""
+    normal = [label for label in order if label not in malignant]
+    colors = {label: NORMAL_PALETTE[i % len(NORMAL_PALETTE)] for i, label in enumerate(normal)}
+    colors.update({label: MALIGNANT_COLORS[min(i, len(MALIGNANT_COLORS) - 1)] for i, label in enumerate(malignant)})
+    return colors
+
+
+
 def sample_flags(warnings: pd.DataFrame, samples) -> pd.Series:
     """Highest severity rank (0 = none, 1 info, 2 warning, 3 caution) of the sample-scope warnings per sample."""
     sample_rows = warnings[warnings["scope"] == "sample"]
@@ -53,7 +84,7 @@ def warning_banner(warnings: pd.DataFrame, n_hidden: int, container=st) -> None:
     run = warnings[warnings["scope"] == "run"]
     worst = run["severity"].map(SEVERITY_RANK).max() if len(run) else 0
     n_flagged = warnings.loc[warnings["scope"] == "sample", "sample_id"].nunique()
-    text = f"{len(run)} run-level notes; {n_flagged} samples with a warning"
+    text = f"{len(run)} notes on the whole cohort; {n_flagged} samples with a warning"
     text += f" ({n_hidden} hidden)." if n_hidden else " (all shown and marked)." if n_flagged else "."
     show = container.error if worst == 3 else container.warning if worst == 2 else container.info
     show(text, icon=":material/warning:")
@@ -62,7 +93,7 @@ def warning_banner(warnings: pd.DataFrame, n_hidden: int, container=st) -> None:
 def warning_details(warnings: pd.DataFrame) -> None:
     with st.expander("Warning details"):
         if warnings.empty:
-            st.caption("No warnings for this layer.")
+            st.caption("No warnings for this cohort, method and level.")
         else:
             st.dataframe(warnings[["severity", "scope", "sample_id", "code", "message", "source"]],
                          hide_index=True, width="stretch")
@@ -94,14 +125,15 @@ def sorted_stacks(P, flags, groups, group_order, sort_by, colors) -> None:
         barmode="stack", bargap=0, height=520, margin=dict(t=10, b=10),
         xaxis=dict(tickmode="array", tickvals=list(centers.values()),
                    ticktext=[f"{g} (n={sum(groups[s] == g for s in ids)})" for g in centers]),
-        yaxis=dict(tickformat=".0%", range=[0, 1.08], title="proportion"))
+        yaxis=dict(tickformat=".0%", range=[0, 1.08], title="proportion"), legend=LEGEND_BELOW)
     st.plotly_chart(fig, width="stretch")
 
 
-def heatmap_with_tracks(P, flags, groups, group_order, sort_by, run_notes) -> None:
+def heatmap_with_tracks(P, flags, groups, group_order, sort_by, run_notes, malignant_rows=()) -> None:
     """Cell types x samples heatmap with a group track and a warning track; run-level notes in a side panel."""
     ids = order_samples(P, groups, group_order, sort_by)
-    rows = P.mean(axis=1).sort_values(ascending=False).index.tolist()
+    malignant = [label for label in reversed(P.index) if label in set(malignant_rows)]
+    rows = malignant + [r for r in P.mean(axis=1).sort_values(ascending=False).index if r not in malignant]
     k = len(group_order)
     group_colors = [PALETTE[i % len(PALETTE)] for i in range(k)]
     stops = [[b, c] for i, c in enumerate(group_colors) for b in (i / k, (i + 1) / k)]  # one flat band per group
@@ -128,7 +160,7 @@ def heatmap_with_tracks(P, flags, groups, group_order, sort_by, run_notes) -> No
         st.markdown("**Groups**")
         for g in group_order:
             st.caption(f"{g}: n={sum(groups[s] == g for s in ids)}")
-        st.markdown("**Run-level notes**")
+        st.markdown("**Notes on the whole cohort**")
         for _, row in run_notes.iterrows():
             st.caption(f"{row['severity'].upper()}: {row['message']}")
         if show_flags:
@@ -142,11 +174,13 @@ def group_summary(P, flags, groups, group_order, colors) -> None:
     for label in P.index:
         fig.add_bar(y=means.columns, x=means.loc[label], name=label, orientation="h", marker_color=colors[label],
                     hovertemplate=label + ": %{x:.1%}<extra></extra>")
-    fig.update_layout(barmode="stack", height=80 + 42 * len(group_order), margin=dict(t=10, b=10),
-                      xaxis=dict(tickformat=".0%", range=[0, 1]), yaxis=dict(autorange="reversed"))
+    fig.update_layout(barmode="stack", height=200 + 42 * len(group_order), margin=dict(t=10, b=10),
+                      xaxis=dict(tickformat=".0%", range=[0, 1]), yaxis=dict(autorange="reversed"),
+                      legend={**LEGEND_BELOW, "y": -0.15, "traceorder": "normal"})  # left to right, as the bars
     st.plotly_chart(fig, width="stretch")
 
-    default = list(P.index).index(MALIGNANT) if MALIGNANT in P.index else 0
+    first_malignant = next((label for label in reversed(P.index) if label == MALIGNANT or label in MALIGNANT_STATE_ORDER), None)
+    default = list(P.index).index(first_malignant) if first_malignant else 0
     label = st.selectbox("Distribution of", list(P.index), index=default, key="dc_drill")
     box = go.Figure()
     for i, g in enumerate(group_order):
@@ -168,8 +202,7 @@ def group_summary(P, flags, groups, group_order, colors) -> None:
 def composition_tab() -> None:
     cohorts = data.deconvolution_cohorts()
     if not cohorts:
-        st.info("No deconvolution results found. In AML_data_processing run `uv run prepare_deconvolution.py` "
-                "after the two `prepare_*.R` scripts.")
+        st.info("No deconvolution estimates are available.")
         return
     names = data.patient_cohort_names()
 
@@ -178,8 +211,8 @@ def composition_tab() -> None:
     runs = data.deconvolution_runs(cohort)
     methods = [m for m in METHOD_LABEL if m in set(runs["method"])] or sorted(set(runs["method"]))
     method = c2.selectbox("Method", methods, format_func=lambda m: METHOD_LABEL.get(m, m), key="dc_method",
-                          help="Each method and level is its own layer. The updated fit depends on the other "
-                               "samples in the cohort and is flagged as such.")
+                          help="The initial fit uses the reference as built. The updated fit adapts the reference to "
+                               "the cohort, so a sample's estimate depends on the other samples in the cohort.")
     levels = [lv for lv in LEVEL_LABEL if lv in set(runs.loc[runs["method"] == method, "level"])]
     level = c3.selectbox("Level", levels, format_func=LEVEL_LABEL.get, key="dc_level")
     if levels == ["cell_type"]:
@@ -188,6 +221,8 @@ def composition_tab() -> None:
     key = run["key"]
 
     P = data.patient_values(cohort, key).dropna(axis=1, how="all")
+    malignant = malignant_labels(run["reference"], level, P.index)
+    P = P.loc[stack_order(P.index, malignant)]
     warnings = data.deconvolution_warnings(cohort)
     warnings = warnings[warnings["key"].isin(["", key])]
     flags = sample_flags(warnings, P.columns)
@@ -197,19 +232,19 @@ def composition_tab() -> None:
     group_cols = ["(none)"] + [c for c in grouping.index if c in samples]
     group_col = c4.selectbox("Group by", group_cols, key="dc_group",
                              format_func=lambda c: c if c == "(none)" else grouping.loc[c, "label"])
-    sort_by = c5.selectbox("Sort samples by", ["(none)"] + list(P.index), key="dc_sort",
-                           index=(list(P.index).index(MALIGNANT) + 1) if MALIGNANT in P.index else 0)
+    sort_options = ["(none)"] + list(P.index)
+    sort_by = c5.selectbox("Sort samples by", sort_options, key="dc_sort",
+                           index=sort_options.index(malignant[0]) if malignant else 0)
 
     hide = st.toggle("Hide samples with a warning", value=True, key="dc_hide",
-                     help="Leaves out every sample that has a sample-level warning (any severity) for this layer, "
-                          "from all three views. Turn it off to show them, marked.")
+                     help="Leaves out every sample with a warning (any severity) for this method and level, from "
+                          "all three views. Turn it off to show them, marked.")
     n_hidden = int((flags > 0).sum()) if hide else 0
     if hide:
         P = P.loc[:, flags[flags == 0].index]
         flags = flags[P.columns]
     st.caption(f"{P.shape[1]} samples shown, {P.shape[0]} {LEVEL_LABEL[level].lower()}s. "
-               f"Quantity: {QUANTITY_LABEL.get(run['quantity'], run['quantity'])}. Layer `{key}`, "
-               f"run {run.get('run_date', '')}.")
+               f"Values are {QUANTITY_LABEL.get(run['quantity'], run['quantity'])}.")
     warning_banner(warnings, n_hidden)
     warning_details(warnings)
     if P.empty:
@@ -220,13 +255,13 @@ def composition_tab() -> None:
                     if group_col != "(none)" else pd.Series("all", index=P.columns))
     groups = {s: group_series.get(s, "NA") for s in P.columns}
     group_order = sorted(set(groups.values()))
-    colors = {label: PALETTE[i % len(PALETTE)] for i, label in enumerate(P.index)}
+    colors = label_colors(list(P.index), malignant)
 
     tab_stacks, tab_heatmap, tab_summary = st.tabs(["Sorted stacks", "Heatmap", "Group summary"])
     with tab_stacks:
         sorted_stacks(P, flags, groups, group_order, sort_by, colors)
     with tab_heatmap:
-        heatmap_with_tracks(P, flags, groups, group_order, sort_by, warnings[warnings["scope"] == "run"])
+        heatmap_with_tracks(P, flags, groups, group_order, sort_by, warnings[warnings["scope"] == "run"], malignant)
     with tab_summary:
         group_summary(P, flags, groups, group_order, colors)
 
@@ -235,7 +270,7 @@ def composition_tab() -> None:
 def reference_tab() -> None:
     references = data.single_cell_references()
     if not references:
-        st.info("No reference summary found (`results/single_cell/<REFERENCE_ID>/`).")
+        st.info("No reference is available.")
         return
     reference = references[0] if len(references) == 1 else st.selectbox("Reference", references, key="dc_reference")
     provenance = data.reference_provenance(reference)
@@ -273,7 +308,7 @@ def reference_tab() -> None:
     st.dataframe(pd.DataFrame([(k, v) for k, v in provenance.items() if k not in skip],
                               columns=["item", "value"]), hide_index=True, width="stretch")
 
-    st.subheader("Layers built with this reference")
+    st.subheader("Cohorts estimated with this reference")
     names = data.patient_cohort_names()
     built = [data.deconvolution_runs(c).assign(cohort=names.get(c, c)) for c in data.deconvolution_cohorts()]
     if built:
@@ -281,4 +316,4 @@ def reference_tab() -> None:
         built = built[built["reference"] == reference]
         built = built.assign(method=built["method"].map(lambda m: METHOD_LABEL.get(m, m)),
                              level=built["level"].map(lambda lv: LEVEL_LABEL.get(lv, lv)))
-        st.dataframe(built[["cohort", "method", "level", "run_date"]], hide_index=True, width="stretch")
+        st.dataframe(built[["cohort", "method", "level"]], hide_index=True, width="stretch")
