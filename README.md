@@ -12,6 +12,15 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/streamlit run app.py
 ```
 
+With [uv](https://docs.astral.sh/uv/), dependencies come from `pyproject.toml` (locked in `uv.lock`):
+
+```bash
+uv run streamlit run app.py
+```
+
+This creates `.venv/` in the repo. To keep the environment elsewhere, set `UV_PROJECT_ENVIRONMENT=/path/to/env`.
+`requirements.txt` mirrors the dependencies for pip and hosts that read it: change both together.
+
 The data is found at, in order: `$AML_PORTAL_DATA`, `data/results/`, then
 `../AML_data_processing/results/`.
 
@@ -51,6 +60,8 @@ tests/            stats vs scipy/R, results consistency, page smoke tests (AppTe
 
 ```bash
 .venv/bin/pytest -q
+# or with uv
+uv run pytest -q
 ```
 
 ## Deploy
