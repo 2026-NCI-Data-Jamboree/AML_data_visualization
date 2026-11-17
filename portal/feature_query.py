@@ -81,12 +81,18 @@ def patient_feature_query(kp: str = "pfq") -> None:
         return
     names = data.patient_cohort_names()
     genes = sorted(idx["gene"].unique())
-    # groupings offered: union over cohorts, in groupings.tsv order, labelled as in the first cohort
-    glabels = {}
+    # groupings offered: only annotations filled in at least half of the cohorts (cohort-specific ones,
+    # e.g. proteomic subtype, are left out), in groupings.tsv order, labelled as in the first cohort
+    glabels, n_annot = {}, {}
     for c in names:
+        s = data.patient_samples(c)
         for col, r in data.patient_groupings(c).iterrows():
-            if col not in ("MYC_high", "mTOR_high", "MYC_mTOR_category", "cell_state"):   # not offered here
+            if col in ("MYC_high", "mTOR_high", "MYC_mTOR_category", "cell_state"):   # not offered here
+                continue
+            if col in s and s[col].notna().any():
                 glabels.setdefault(col, r["label"])
+                n_annot[col] = n_annot.get(col, 0) + 1
+    glabels = {k: v for k, v in glabels.items() if n_annot[k] >= len(names) / 2}
     st.markdown("Look up one gene in every patient cohort.")
     layer_keys = [k for k in data.LAYER_LABELS if k in set(idx["dataset"])] + \
                  sorted(set(idx["dataset"]) - set(data.LAYER_LABELS))
