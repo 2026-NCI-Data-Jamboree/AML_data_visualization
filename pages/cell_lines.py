@@ -5,6 +5,12 @@ from portal import data, plots
 from portal.dependency import gene_dependency
 from portal.feature_query import cell_line_feature_query
 from portal.stats import welch
+from portal.cooccurrence import cooccurrence_tab
+from portal.copy_number import copy_number_tab
+from portal.mutation_cnv import mutation_cnv_tab
+from portal.mutation_frequency import mutation_frequency_tab
+from portal.similar_lines import similar_lines_tab
+from portal.surfaceome import surfaceome_section
 
 st.title("Cell lines")
 st.caption("Built-in analysis 2 · AML cell-line variability")
@@ -18,7 +24,9 @@ cl = data.cell_lines()
 dsets = data.datasets().set_index("key")
 GROUPINGS = data.grouping_labels()
 
-tab_lines, tab_fq, tab_cmp, tab_dep = st.tabs(["Overview", "Feature query", "Compare groups", "Gene dependency"])
+tab_lines, tab_fq, tab_cmp, tab_dep, tab_co, tab_mf, tab_cn, tab_mc, tab_sim, tab_surf = st.tabs(
+    ["Overview", "Feature query", "Compare groups", "Gene dependency", "Co-occurrence", "Mutation frequency",
+     "Copy number", "Mutation–CNV", "Similar lines", "Cell surface proteins"])
 
 with tab_lines:
     G = data.groupings()
@@ -72,6 +80,24 @@ with tab_fq:
 
 with tab_dep:  # before the compare block, which may st.stop()
     gene_dependency()
+
+with tab_co:  # these tabs come before the compare block, which may st.stop()
+    cooccurrence_tab()
+
+with tab_mf:
+    mutation_frequency_tab()
+
+with tab_cn:
+    copy_number_tab()
+
+with tab_mc:
+    mutation_cnv_tab()
+
+with tab_sim:
+    similar_lines_tab()
+
+with tab_surf:
+    surfaceome_section()
 
 with tab_cmp:
     c1, c2, c3, c4 = st.columns([3, 2, 2, 3])
