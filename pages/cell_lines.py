@@ -7,6 +7,7 @@ from portal.feature_query import cell_line_feature_query
 from portal.stats import welch
 from portal.cooccurrence import cooccurrence_tab
 from portal.copy_number import copy_number_tab
+from portal.drug_sensitivity import drug_sensitivity_section
 from portal.mutation_cnv import mutation_cnv_tab
 from portal.mutation_frequency import mutation_frequency_tab
 from portal.similar_lines import similar_lines_tab
@@ -24,9 +25,9 @@ cl = data.cell_lines()
 dsets = data.datasets().set_index("key")
 GROUPINGS = data.grouping_labels()
 
-tab_lines, tab_fq, tab_cmp, tab_dep, tab_co, tab_mf, tab_cn, tab_mc, tab_sim, tab_surf = st.tabs(
+tab_lines, tab_fq, tab_cmp, tab_dep, tab_co, tab_mf, tab_cn, tab_mc, tab_sim, tab_drug, tab_surf = st.tabs(
     ["Overview", "Feature query", "Compare groups", "Gene dependency", "Co-occurrence", "Mutation frequency",
-     "Copy number", "Mutation–CNV", "Similar lines", "Cell surface proteins"])
+     "Copy number", "Mutation–CNV", "Similar lines", "Drug sensitivity", "Cell surface proteins"])
 
 with tab_lines:
     G = data.groupings()
@@ -95,6 +96,9 @@ with tab_mc:
 
 with tab_sim:
     similar_lines_tab()
+
+with tab_drug:
+    drug_sensitivity_section()
 
 with tab_surf:
     surfaceome_section()

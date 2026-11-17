@@ -176,3 +176,84 @@ def neighbour_bars(nb: pd.DataFrame) -> go.Figure:
     fig.update_layout(yaxis=dict(title="Jaccard similarity", range=[0, 1.1]), height=320,
                       margin=dict(l=10, r=10, t=10, b=10), xaxis=dict(type="category", tickangle=-45))
     return fig
+
+
+def drug_volcano(res: pd.DataFrame, hit: pd.Series, n_label: int = 6) -> go.Figure:
+    """Aberration x drug tests: x = ΔAUC (with − without; < 0 = more sensitive with), y = −log10 p.
+    Blue = significant and more sensitive, red = significant and more resistant; top n labelled."""
+    r = res.assign(y=-np.log10(res["p"].clip(lower=1e-300)))
+    col = np.where(hit & (r["dAUC"] < 0), COL_A, np.where(hit, COL_B, "rgba(140,140,140,0.35)"))
+    txt = r["label"] + " · " + r["compound"].astype(str)
+    fig = go.Figure(go.Scattergl(x=r["dAUC"], y=r["y"], mode="markers", text=txt,
+                                 marker=dict(color=col, size=np.where(hit, 7, 5), line=dict(width=0)),
+                                 hovertemplate="%{text}<br>ΔAUC %{x:+.3f}<br>−log10 p %{y:.2f}<extra></extra>"))
+    for k, (_, t) in enumerate(r.nsmallest(n_label, "p").iterrows()):
+        fig.add_annotation(x=t["dAUC"], y=t["y"], text=f"{t['label']} · {t['compound']}", showarrow=True, arrowhead=0,
+                           arrowwidth=1, arrowcolor="#8a8984", ax=(60 if t["dAUC"] < 0 else -60), ay=-18 - 14 * (k % 3),
+                           font=dict(size=11), bgcolor="rgba(255,255,255,0.75)")
+    fig.add_vline(x=0, line_width=1, line_color="#52514e")
+    fig.add_annotation(x=0, xref="paper", y=1.02, yref="paper", text="← more sensitive with aberration", showarrow=False,
+                       xanchor="left", font=dict(size=11, color=COL_A))
+    fig.add_annotation(x=1, xref="paper", y=1.02, yref="paper", text="more resistant with aberration →", showarrow=False,
+                       xanchor="right", font=dict(size=11, color=COL_B))
+    fig.update_layout(xaxis_title="ΔAUC (with − without)", yaxis_title="−log10(p-value)", height=440,
+                      margin=dict(l=10, r=10, t=30, b=10), plot_bgcolor="rgba(0,0,0,0)")
+    fig.update_xaxes(zeroline=False, gridcolor="rgba(140,140,140,0.15)")
+    fig.update_yaxes(gridcolor="rgba(140,140,140,0.15)")
+    return fig
+
+
+def target_bars(top: pd.DataFrame, unit: str) -> go.Figure:
+    """Horizontal bars: median expression of the most highly expressed drug targets."""
+    d = top.sort_values("median")
+    fig = go.Figure(go.Bar(y=d["gene"], x=d["median"], orientation="h", marker_color=COL_A,
+                           customdata=np.c_[d["n_drugs"], d["drugs"].str.slice(0, 80)],
+                           hovertemplate="%{y}: %{x:.2f}<br>%{customdata[0]} drugs: %{customdata[1]}<extra></extra>"))
+    fig.update_xaxes(title=f"median across AML lines · {unit}")
+    fig.update_yaxes(type="category", automargin=True, tickfont=dict(size=10))
+    fig.update_layout(height=140 + 18 * len(d), margin=dict(l=10, r=10, t=10, b=10))
+    return fig
+
+
+def group_box(df: pd.DataFrame, value_col: str, group_col: str, order: list[str], title: str,
+              y_title: str = "", subtitle: str = "", colors: dict | None = None) -> go.Figure:
+    """Tidy box + points per group for small multiples: horizontal wrapped labels with n,
+    light box fill, outlined points, bold title with an optional stats subtitle."""
+    colors = colors or {}
+    fig = go.Figure()
+    ticks = []
+    for i, g in enumerate(order):
+        s = df[df[group_col] == g].dropna(subset=[value_col])
+        if s.empty:
+            continue
+        col = colors.get(g, COL_NS if g == "not annotated" else SEQ[i % len(SEQ)])
+        tick = f"{_wrap(g)}<br><span style='font-size:10px'>n={len(s)}</span>"
+        ticks.append(tick)
+        fig.add_trace(go.Box(
+            x=[tick] * len(s), y=s[value_col], name=g, boxpoints="all", jitter=0.45, pointpos=0, width=0.55,
+            marker=dict(color=col, size=6, opacity=0.85, line=dict(width=0.8, color="white")),
+            line=dict(color=col, width=1.5), fillcolor=_alpha(col, 0.12), text=s["cell_line"],
+            hovertemplate="%{text}: %{y:.2f}<extra></extra>"))
+    head = f"<b>{title}</b>" + (f"<br><span style='font-size:11px;color:#8a8984'>{subtitle}</span>" if subtitle else "")
+    fig.update_layout(title=dict(text=head, x=0, xanchor="left", y=0.97, font=dict(size=15)),
+                      yaxis_title=y_title, showlegend=False, height=340, boxgap=0.35,
+                      margin=dict(l=10, r=10, t=58 if subtitle else 40, b=10))
+    fig.update_xaxes(type="category", categoryorder="array", categoryarray=ticks, tickangle=0, tickfont=dict(size=11))
+    fig.update_yaxes(zeroline=False, gridcolor="rgba(140,140,140,0.2)")
+    return fig
+
+
+def _wrap(label: str, width: int = 14) -> str:
+    """Break a group label onto two lines at a space / hyphen near the middle, for horizontal ticks."""
+    if len(label) <= width:
+        return label
+    cut = max((i for i, ch in enumerate(label) if ch in " -/" and i <= len(label) * 0.6), default=-1)
+    return label if cut <= 0 else label[:cut + 1].rstrip() + "<br>" + label[cut + 1:].lstrip()
+
+
+def _alpha(color: str, a: float) -> str:
+    """'#rrggbb' -> 'rgba(r,g,b,a)'; other colour strings are returned unchanged."""
+    if color.startswith("#") and len(color) == 7:
+        r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+        return f"rgba({r},{g},{b},{a})"
+    return color

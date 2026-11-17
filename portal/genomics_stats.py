@@ -1,6 +1,8 @@
 """Statistics for the genomic cell-line tabs (co-occurrence, mutation frequency, mutation-CNV, similar lines)."""
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -102,3 +104,56 @@ def jaccard_similarity(X: pd.DataFrame) -> pd.DataFrame:
     with np.errstate(invalid="ignore", divide="ignore"):
         J = np.where(union > 0, inter / union, np.nan)
     return pd.DataFrame(J, index=X.index, columns=X.index)
+
+
+def correlate(X: pd.DataFrame, y: pd.Series, method: str = "pearson", min_n: int = 8) -> pd.DataFrame:
+    """Correlation of every row of X (features x lines) with y (values per line), pairwise
+    complete. Spearman = Pearson on ranks (ranked within the shared lines of each feature).
+    Two-sided p from the t distribution; BH FDR across tested features."""
+    lines = [c for c in X.columns if c in y.index]
+    A = X[lines].to_numpy(float)
+    b = y.reindex(lines).to_numpy(float)
+    ok = np.isfinite(A) & np.isfinite(b)[None, :]
+    n = ok.sum(1)
+    if method == "spearman":
+        Am = np.where(ok, A, np.nan)
+        A = pd.DataFrame(Am).rank(axis=1).to_numpy()
+        B = pd.DataFrame(np.where(ok, b[None, :], np.nan)).rank(axis=1).to_numpy()
+    else:
+        A, B = np.where(ok, A, np.nan), np.where(ok, b[None, :], np.nan)
+    with np.errstate(invalid="ignore", divide="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        A = A - np.nanmean(A, 1, keepdims=True)
+        B = B - np.nanmean(B, 1, keepdims=True)
+        r = np.nansum(A * B, 1) / np.sqrt(np.nansum(A**2, 1) * np.nansum(B**2, 1))
+        r = np.clip(r, -1, 1)
+        t = r * np.sqrt((n - 2) / np.maximum(1 - r**2, 1e-300))
+        p = 2 * stats.t.sf(np.abs(t), n - 2)
+    res = pd.DataFrame({"feature": X.index, "r": r, "n": n, "p": p})
+    res = res[(n >= min_n) & np.isfinite(r)].copy()
+    res["q"] = bh(res["p"].to_numpy())
+    return res.sort_values("p").reset_index(drop=True)
+
+
+def rowwise_correlate(A: pd.DataFrame, B: pd.DataFrame, method: str = "spearman", min_n: int = 6) -> pd.DataFrame:
+    """Correlation of matching rows of A and B (e.g. a gene's protein vs its CRISPR effect) across their
+    shared columns, pairwise complete. Rows = genes in both; BH FDR across genes."""
+    genes = A.index.intersection(B.index)
+    cols = A.columns.intersection(B.columns)
+    a, b = A.loc[genes, cols].to_numpy(float), B.loc[genes, cols].to_numpy(float)
+    ok = np.isfinite(a) & np.isfinite(b)
+    a, b = np.where(ok, a, np.nan), np.where(ok, b, np.nan)
+    if method == "spearman":
+        a, b = pd.DataFrame(a).rank(axis=1).to_numpy(), pd.DataFrame(b).rank(axis=1).to_numpy()
+    n = ok.sum(1)
+    with np.errstate(invalid="ignore", divide="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        a = a - np.nanmean(a, 1, keepdims=True)
+        b = b - np.nanmean(b, 1, keepdims=True)
+        r = np.clip(np.nansum(a * b, 1) / np.sqrt(np.nansum(a**2, 1) * np.nansum(b**2, 1)), -1, 1)
+        t = r * np.sqrt((n - 2) / np.maximum(1 - r**2, 1e-300))
+        p = 2 * stats.t.sf(np.abs(t), n - 2)
+    res = pd.DataFrame({"gene": genes, "r": r, "n": n, "p": p})
+    res = res[(n >= min_n) & np.isfinite(r)].copy()
+    res["q"] = bh(res["p"].to_numpy())
+    return res.sort_values("p").reset_index(drop=True)
