@@ -1,6 +1,18 @@
 import streamlit as st
 
+from portal import data
 from portal.deconvolution import composition_tab, reference_tab
+
+
+def _safe(section: str, fn) -> None:
+    """Run one part of the page; a missing or malformed file shows a message instead of breaking the page."""
+    try:
+        fn()
+    except Exception as e:                          # noqa: BLE001 - any data problem should stay on this tab
+        st.error(f"The {section} could not be shown: the deconvolution files look incomplete or out of date. "
+                 "Re-run the deconvolution step of the processing pipeline.", icon=":material/error:")
+        with st.expander("Technical details"):
+            st.code(f"{type(e).__name__}: {e}")
 
 st.title("Deconvolution")
 st.caption("Built-in analysis 3")
@@ -9,11 +21,21 @@ st.markdown(
     "AML bone marrow (AML scAtlas). The proportions are estimates, not measurements; see *About these estimates* below."
 )
 
+try:
+    ready, refs = data.has_deconvolution(), bool(data.single_cell_references())
+except Exception:                                   # noqa: BLE001 - e.g. no results folder at all
+    ready, refs = False, False
+if not ready:
+    st.info("**Deconvolution results are not available yet.** They are produced by the deconvolution step of the "
+            "processing pipeline (AML_data_processing) and appear here once that step has been run"
+            + (". The single-cell reference can already be browsed in the *Reference* tab." if refs else
+               ", together with the single-cell reference."), icon=":material/hourglass_empty:")
+
 tab_composition, tab_reference = st.tabs(["Composition", "Reference"])
 with tab_composition:
-    composition_tab()
+    _safe("composition", composition_tab)
 with tab_reference:
-    reference_tab()
+    _safe("reference", reference_tab)
 
 st.divider()
 st.subheader("About these estimates")

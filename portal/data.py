@@ -311,6 +311,14 @@ def deconvolution_cohorts() -> list[str]:
     return [c for c in patient_cohorts() if len(deconvolution_runs(c))]
 
 
+def has_deconvolution() -> bool:
+    """True when any cohort has deconvolution results; the Deconvolution page is shown only then."""
+    try:
+        return bool(deconvolution_cohorts())
+    except Exception:                       # no results folder, unreadable files, ...
+        return False
+
+
 @st.cache_data(show_spinner=False)
 def deconvolution_warnings(cohort: str) -> pd.DataFrame:
     """deconvolution_warnings.tsv: key (empty = every layer), scope, sample_id, label, severity, code, message, source."""

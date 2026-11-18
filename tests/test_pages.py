@@ -132,3 +132,23 @@ def test_highlights_survival_tab():
     at.selectbox(key="sv_risk").set_value("Within one risk group").run()
     at.selectbox(key="sv_risk_level").set_value("favorable").run()
     assert not at.exception, at.exception
+
+
+@needs_data
+def test_deconvolution_page_handles_missing_and_broken_data():
+    from portal import data
+    at = AppTest.from_file(str(ROOT / "pages/deconvolution.py"), default_timeout=180).run()
+    assert not at.exception, at.exception
+    if not data.has_deconvolution():                       # no results yet: banner instead of a crash
+        assert any("not available yet" in i.value for i in at.info)
+    # a malformed file in one tab: an error message on that tab, the rest of the page still renders
+    broken = AppTest.from_string(f"""
+import portal.deconvolution as d
+def boom():
+    raise KeyError("missing column")
+d.composition_tab = boom
+exec(open({str(ROOT / "pages/deconvolution.py")!r}).read())
+""", default_timeout=180).run()
+    assert not broken.exception, broken.exception
+    assert any("could not be shown" in e.value for e in broken.error)
+    assert any(t.label == "Reference" for t in broken.tabs)
