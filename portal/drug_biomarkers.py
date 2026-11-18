@@ -51,7 +51,7 @@ def drug_biomarkers(kp: str = "db") -> None:
 
     # data type first; then the drugs, counting only cohorts that have both the drug and that data type
     has_layer = {c: {k for k, m in data.patient_datasets(c)[["key", "modality"]].itertuples(index=False)
-                     if m != "drug_screen"} for c in idx["cohort"].unique()}
+                     if m not in ("drug_screen", "deconvolution")} for c in idx["cohort"].unique()}
     order = list(data.LAYER_LABELS)
     layers = sorted(set().union(*has_layer.values()), key=lambda k: (order.index(k) if k in order else 99, k))
     if not layers:
@@ -190,7 +190,7 @@ def drug_marker_lookup(kp: str = "dm") -> None:
                 "For a genome-wide search across all markers, see **Highlights**.")
 
     has_layer = {c: {k for k, m in data.patient_datasets(c)[["key", "modality"]].itertuples(index=False)
-                     if m != "drug_screen"} for c in idx["cohort"].unique()}
+                     if m not in ("drug_screen", "deconvolution")} for c in idx["cohort"].unique()}
     order = list(data.LAYER_LABELS)
     layers = sorted(set().union(*has_layer.values()), key=lambda k: (order.index(k) if k in order else 99, k))
     c1, c2, c3, c4 = st.columns([2, 2, 3, 2])

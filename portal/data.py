@@ -11,6 +11,9 @@ import pandas as pd
 import streamlit as st
 
 SUPPORTED_RESULTS_VERSION = "3"
+# the published harmonized dataset (the results/ folder), for users who want all files in one download
+FIGSHARE_URL = ("https://figshare.com/articles/dataset/Building_a_Harmonized_Multi-Omics_Resource_and_Web_Application_"
+                "for_Biomarker_Discovery_and_Drug_Target_Nomination_in_Leukemia/35050459")
 _REPO = Path(__file__).resolve().parent.parent
 _CANDIDATES = [
     _REPO / "data" / "results",

@@ -6,6 +6,9 @@ from portal import data
 st.title("Downloads")
 st.markdown("The list of datasets, the shared annotation vocabulary, and every processed data file "
             "behind the portal.")
+st.info(f"The complete harmonized dataset is publicly available on [figshare]({data.FIGSHARE_URL}) as one download: "
+        "unzip it into the portal's `data/results/` folder to run the portal yourself. The tabs below offer the same "
+        "files one at a time.", icon=":material/cloud_download:")
 
 tab_readme, tab_datasets, tab_files, tab_pfiles, tab_schema = st.tabs(
     ["About the data", "Datasets", "Cell-line files", "Patient files", "Annotation schema"])

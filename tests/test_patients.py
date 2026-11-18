@@ -45,7 +45,7 @@ def test_meta_correlation_fisher_z():
 
 @needs_patients
 def test_patient_results_follow_contract():
-    for d in sorted(PATIENTS.iterdir()):
+    for d in sorted(p for p in PATIENTS.iterdir() if p.is_dir()):        # skip e.g. macOS .DS_Store
         s = pd.read_csv(d / "samples.tsv", sep="\t", low_memory=False)
         assert s["sample_id"].is_unique, d.name
         ds = pd.read_csv(d / "datasets.tsv", sep="\t")

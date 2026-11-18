@@ -85,7 +85,7 @@ def _grouping_options(cohort: str, s: pd.DataFrame) -> dict[str, dict[str, str]]
 
 def _expression_layers(cohort: str) -> list[str]:
     ds = data.patient_datasets(cohort)
-    return list(ds.loc[ds["modality"] != "drug_screen", "key"])
+    return list(ds.loc[~ds["modality"].isin(["drug_screen", "deconvolution"]), "key"])   # molecular layers only
 
 
 def _groups(cohort: str, s: pd.DataFrame, key: str, kp: str) -> tuple[pd.Series, list[str], str]:

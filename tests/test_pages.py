@@ -152,3 +152,13 @@ exec(open({str(ROOT / "pages/deconvolution.py")!r}).read())
     assert not broken.exception, broken.exception
     assert any("could not be shown" in e.value for e in broken.error)
     assert any(t.label == "Reference" for t in broken.tabs)
+
+
+@needs_data
+def test_figshare_link_on_documentation_and_downloads():
+    from portal import data
+    for page in ["pages/documentation.py", "pages/downloads.py"]:
+        at = AppTest.from_file(str(ROOT / page), default_timeout=180).run()
+        assert not at.exception, at.exception
+        text = " ".join([m.value for m in at.markdown] + [i.value for i in at.info])
+        assert data.FIGSHARE_URL in text, page
