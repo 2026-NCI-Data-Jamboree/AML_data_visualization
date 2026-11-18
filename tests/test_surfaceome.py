@@ -1,4 +1,4 @@
-"""Highlights page, Cell surface proteins tab: key findings, marker expression, multi-antigen."""
+"""Highlights page, Cell surface proteins tab: volcano plot and result table per subgroup comparison."""
 from pathlib import Path
 
 import pytest
@@ -15,25 +15,14 @@ needs_surface = pytest.mark.skipif(not (CL / "values" / "surface_george.tsv.gz")
 def test_surfaceome_page_and_controls():
     at = AppTest.from_file(str(ROOT / "pages/highlights.py"), default_timeout=600).run()
     assert not at.exception, at.exception
-    assert any(h.value == "Featured findings" for h in at.subheader)
-    for rule in ["above percentile", "above value", "detected"]:
-        at.segmented_control(key="su_rule").set_value(rule).run()
-        assert not at.exception, (rule, at.exception)
-    at.segmented_control(key="hl_rule").set_value("p < 0.01").run()
-    at.toggle(key="hl_surf").set_value(True).run()
-    at.multiselect(key="hl_feat").set_value([]).run()
-    at.selectbox(key="sm_m").set_value("FLT3").run()
-    at.segmented_control(key="sm_scope").set_value("all markers").run()
-    at.segmented_control(key="ma_logic").set_value("all (AND)").run()
-    at.segmented_control(key="ma_size").set_value(3).run()
+    assert not any(h.value in ("Featured findings", "Key volcano plots", "Top findings") for h in at.subheader)
+    assert not any(s.key == "su_rule" for s in at.segmented_control)            # no positivity rule
+    assert not any(t.label in ("Marker expression", "Multi-antigen") for t in at.tabs)
+    at.selectbox(key="hl_vc").set_value("TP53-mutant vs not").run()
+    at.segmented_control(key="hl_vrule").set_value("q < 0.1").run()
     assert not at.exception, at.exception
-
-
-def test_positive_rules():
-    import numpy as np
-    import pandas as pd
-    from portal.surfaceome import positive
-    v = pd.Series([np.nan, 1.0, 2.0, 3.0, 4.0], index=list("abcde"))
-    assert positive(v, "detected", 0).tolist() == [False, True, True, True, True]
-    assert positive(v, "above value", 2.5).tolist() == [False, False, False, True, True]
-    assert positive(v, "above percentile", 50).sum() == 2
+    res = [d.value for d in at.dataframe if {"protein", "log2FC", "q"} <= set(d.value.columns)][0]
+    assert len(res) > 100 and "direction" not in res.columns
+    assert res["p"].is_monotonic_increasing
+    at.toggle(key="hl_surf").set_value(True).run()
+    assert not at.exception, at.exception

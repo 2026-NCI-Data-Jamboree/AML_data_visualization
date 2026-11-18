@@ -26,7 +26,7 @@ c3.metric("AML cell lines", len(cl))
 st.subheader("What you can do")
 st.markdown(
     "- **Highlights**: genes that MYC-high vs mTOR-high AML cell lines depend on (CRISPR and RNAi), surface "
-    "proteins measured on AML cell lines (markers and antigen combinations for targeting), RNA, "
+    "proteins that differ between AML cell-line subgroups, RNA, "
     "protein or phosphosite markers of drug response that replicate across patient cohorts *(built-in "
     "analysis 1)*, features that change with age, and genes linked to survival across cohorts.\n"
     "- **Cell lines**: 70 AML cell lines across 11 omics layers. See which data each line has, compare "
