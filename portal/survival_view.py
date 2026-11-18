@@ -30,7 +30,7 @@ UNITS = {"months": 30.4375, "years": 365.25, "days": 1.0}
 SPLITS = {"median (high vs low)": (0.5, 0.5), "tertiles (top vs bottom third)": (1 / 3, 2 / 3),
           "quartiles (top vs bottom quarter)": (0.25, 0.75)}
 EXPRESSION, MUT = "High vs low expression of a gene", "mut:"
-SKIP = {"MYC_high", "mTOR_high", "MYC_mTOR_category", "timepoint"}   # not survival groupings
+SKIP = {"timepoint"}   # not a survival grouping
 MIN_MUTANT = 5
 
 
@@ -53,7 +53,7 @@ def _patients(cohort: str, t_col: str, e_col: str) -> pd.DataFrame:
 def _grouping_options(cohort: str, s: pd.DataFrame) -> dict[str, dict[str, str]]:
     """category -> {option key: label}. Mutation: genes with >= MIN_MUTANT mutant patients here (most
     frequent first); Gene expression: high vs low expression of a chosen gene; Clinical: annotation columns.
-    The MYC / mTOR RNA signature groupings are not offered for survival."""
+    """
     g = data.patient_groupings(cohort)
     muts = {}
     for col in [c for c in g.index if c.startswith("mut_")] + [c for c in s if c.startswith("mut_")]:

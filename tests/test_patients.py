@@ -88,7 +88,7 @@ def test_patient_feature_query_and_cohorts_tabs():
     assert not {"MYC RNA signature", "mTOR RNA signature", "MYC x mTOR RNA category",
                 "Cell state (Primitive / Committed)"} & set(
         at.selectbox(key="pfq_grouping").options)
-    for grouping in ["mut_TP53", "KMT2A_rearranged", "risk_group", "timepoint"]:
+    for grouping in ["mut_TP53", "KMT2A_rearranged", "risk_group", "sex", "timepoint"]:
         at.selectbox(key="pfq_grouping").set_value(grouping).run()
         assert not at.exception, (grouping, at.exception)
     from portal import data

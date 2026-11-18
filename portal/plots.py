@@ -129,7 +129,7 @@ def availability_heatmap(lines: list[str], tracks: list[dict], avail: pd.DataFra
 
 def platform_scatter(df: pd.DataFrame, x_title: str, y_title: str, style: dict[str, tuple[str, str]],
                      n_label: int = 12, zero_lines: tuple = (0, 0), thresholds: tuple | None = None,
-                     no_count: tuple = ()) -> go.Figure:
+                     no_count: tuple = (), hover: tuple[str, str] = ("CRISPR", "RNAi")) -> go.Figure:
     """Gene-level CRISPR vs RNAi scatter. df: gene, x, y, cls, score (lowest = labelled first).
     style: cls -> (colour, legend name), drawn in the given order (last on top).
     customdata = gene symbol, so a Streamlit selection returns the genes picked."""
@@ -142,7 +142,7 @@ def platform_scatter(df: pd.DataFrame, x_title: str, y_title: str, style: dict[s
             x=s["x"], y=s["y"], mode="markers", name=name if cls in no_count else f"{name} ({len(s):,})",
             marker=dict(color=col, size=4 if cls == "ns" else 6, line=dict(width=0)),
             customdata=s["gene"], selected=dict(marker=dict(size=10)),
-            hovertemplate="<b>%{customdata}</b><br>CRISPR %{x:.3f}<br>RNAi %{y:.3f}<extra></extra>"))
+            hovertemplate="<b>%{customdata}</b><br>" + hover[0] + " %{x:.3f}<br>" + hover[1] + " %{y:.3f}<extra></extra>"))
     for _, t in df.nsmallest(n_label, "score").iterrows():
         fig.add_annotation(x=t["x"], y=t["y"], text=t["gene"], showarrow=False, yshift=9, font=dict(size=10))
     fig.add_vline(x=zero_lines[0], line_width=1, line_color="#52514e")

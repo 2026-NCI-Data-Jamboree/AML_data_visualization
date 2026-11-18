@@ -1,14 +1,10 @@
 """Plotly figures for the Surfaceome page (kept separate from plots.py)."""
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from portal.plots import COL_A, COL_B, COL_NS, SEQ
-
-HL = "#111111"
-NA_FILL = "rgba(140,140,140,0.10)"
+from portal.plots import SEQ
 
 
 def _alpha(color: str, a: float) -> str:
@@ -16,6 +12,14 @@ def _alpha(color: str, a: float) -> str:
         r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
         return f"rgba({r},{g},{b},{a})"
     return color
+
+
+def _wrap(label: str, width: int = 14) -> str:
+    """Break a long group label once (at a space, dash or slash) so box-plot tick labels stay readable."""
+    if len(label) <= width:
+        return label
+    cut = max((i for i, ch in enumerate(label) if ch in " -/" and i <= len(label) * 0.6), default=-1)
+    return label if cut <= 0 else label[:cut + 1].rstrip() + "<br>" + label[cut + 1:].lstrip()
 
 
 def group_box(df: pd.DataFrame, order: list[str], title: str, y_title: str = "", subtitle: str = "",
@@ -38,31 +42,6 @@ def group_box(df: pd.DataFrame, order: list[str], title: str, y_title: str = "",
     fig.update_layout(title=dict(text=head, x=0, xanchor="left", y=0.97, font=dict(size=15)), yaxis_title=y_title,
                       showlegend=False, height=340, margin=dict(l=10, r=10, t=58 if subtitle else 40, b=10))
     fig.update_xaxes(type="category", categoryorder="array", categoryarray=ticks, tickangle=0)
-    return fig
-
-
-def volcano(res: pd.DataFrame, highlight: set[str], name_a: str, name_b: str, sig_by: str = "q",
-            fdr: float = 0.1, alpha: float = 0.01) -> go.Figure:
-    """res: feature, diff_A_minus_B, p_welch, fdr_welch. Red = higher in A, blue = lower (at the threshold)."""
-    r = res.assign(y=-np.log10(res["p_welch"].clip(lower=1e-300)))
-    sig = (r["fdr_welch"] < fdr) if sig_by == "q" else (r["p_welch"] < alpha)
-    col = np.where(sig & (r["diff_A_minus_B"] > 0), COL_B, np.where(sig, COL_A, COL_NS))
-    fig = go.Figure(go.Scattergl(x=r["diff_A_minus_B"], y=r["y"], mode="markers", customdata=r["feature"],
-                                 marker=dict(color=col, size=np.where(sig, 7, 4), line=dict(width=0)),
-                                 hovertemplate="<b>%{customdata}</b><br>log2FC %{x:.2f}<br>−log10 p %{y:.2f}"
-                                               "<extra></extra>"))
-    h = r[r["feature"].isin(highlight)]
-    if len(h):
-        fig.add_trace(go.Scatter(x=h["diff_A_minus_B"], y=h["y"], mode="markers+text", text=h["feature"],
-                                 textposition="top center", textfont=dict(size=11, color=HL), hoverinfo="skip",
-                                 marker=dict(size=10, color="rgba(0,0,0,0)", line=dict(width=2, color=HL))))
-    if sig_by == "p":
-        fig.add_hline(y=-np.log10(alpha), line_dash="dot", line_width=1, line_color="#52514e")
-    elif sig.any():
-        fig.add_hline(y=r.loc[sig, "y"].min(), line_dash="dot", line_width=1, line_color="#52514e")
-    fig.add_vline(x=0, line_width=1, line_color="#52514e")
-    fig.update_layout(xaxis_title=f"log2 fold change ({name_a} − {name_b})", yaxis_title="−log10(p-value)",
-                      height=380, showlegend=False, margin=dict(l=10, r=10, t=40, b=10))
     return fig
 
 

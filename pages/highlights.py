@@ -19,7 +19,7 @@ with tab_dep:
                     shared_toggle=False)
 
 with tab_surf:
-    st.caption("AML cell lines: measured cell-surface proteome, compared between subgroups")
+    st.caption("Measured cell-surface proteome of AML cell lines and patient specimens, compared between subgroups")
     surfaceome_section()
 
 with tab_drug:

@@ -55,6 +55,7 @@ with tab_overview:
             rna = av[ds.loc[ds["modality"] == "transcriptomics", "key"]].any(axis=1)
             prot = av[ds.loc[ds["modality"] == "proteomics", "key"]].any(axis=1)
             phos = av[ds.loc[ds["modality"] == "phosphoproteomics", "key"]].any(axis=1)
+            surf = av[ds.loc[ds["modality"] == "surface_proteomics", "key"]].any(axis=1)
             pts = sm.drop_duplicates("participant_id")
             summ[names[c]] = {
                 "samples": len(sm),
@@ -63,6 +64,7 @@ with tab_overview:
                 "drug response": int(drug.sum()),
                 "protein": int(prot.sum()),
                 "phosphosites": int(phos.sum()),
+                "surface protein": int(surf.sum()),
                 "RNA + drug": int((rna & drug).sum()),
                 "protein + drug": int((prot & drug).sum()),
                 "mutation calls": int(sm[[x for x in sm if x.startswith("mut_")]].notna().any(axis=1).sum()),
@@ -134,8 +136,7 @@ with tab_overview:
         c1, c2 = st.columns([2, 3])
         cohort = c1.selectbox("Cohort", list(names), format_func=names.get, key="pt_cohort")
         g = data.patient_groupings(cohort)
-        signature = ["MYC_high", "mTOR_high", "MYC_mTOR_category"]      # not shown in this overview
-        track_opts = [c for c in g.index if c not in signature]
+        track_opts = list(g.index)
         default = [c for c in ["KMT2A_rearranged", "mut_TP53", "mut_FLT3", "mut_NPM1",
                                "risk_group", "timepoint", "cell_state"] if c in track_opts]
         track_cols = c2.multiselect("Annotation tracks", track_opts, default=default,

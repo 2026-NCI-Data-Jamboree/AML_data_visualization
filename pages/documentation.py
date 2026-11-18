@@ -29,7 +29,7 @@ thing everywhere in the portal.
 
 | page | what you can do |
 |---|---|
-| Highlights | gene dependency in cell lines (MYC-high vs mTOR-high, TP53-mutant vs wild-type); cell-surface proteins that differ between AML cell-line subgroups; genome-wide searches across patient cohorts: markers of drug response, features that change with age, and genes linked to survival |
+| Highlights | gene dependency in cell lines (MYC-high vs mTOR-high, TP53-mutant vs wild-type); cell-surface proteins compared between AML subgroups in cell lines and patient specimens; genome-wide searches across patient cohorts: markers of drug response, features that change with age, and genes linked to survival |
 | Cell lines | see which data each line has, which aberrations co-occur, recurrent copy-number changes and which lines are most alike; compare two groups of lines; look up a gene; compare CRISPR and RNAi gene dependency |
 | Patients | see what each cohort contains; look up a gene's RNA, protein or phosphosites in every cohort; check one marker against one drug or against age; compare survival between groups |
 | Deconvolution | see the estimated cell type and cell state composition of patient samples (three views); browse the single-cell reference |
@@ -93,16 +93,15 @@ with tab_methods:
 - **KMT2A rearrangement**: curated status or fusion calls (cell lines); clinical fusion or karyotype
   (patients).
 - **Risk group** (favorable / intermediate / adverse) uses what each cohort reports: ELN 2017 (Beat AML,
-  FPM tumor board), ELN 2010 cytogenetic risk (Lee 2018) or cytogenetic risk (Wang 2022).
+  FPM tumor board), ELN 2010 cytogenetic risk (Lee 2018), cytogenetic risk (Wang 2022) or ELN as reported (Jayavelu 2022:
+  ELN 2017 in the discovery cohort; the validation cohort has no adverse-risk patients).
   St. Jude pediatric AML has no risk group; it has a molecular category (e.g. KMT2A-r, RUNX1::RUNX1T1, NUP98-r) instead.
   TCGA, TARGET, Leucegene and LUMC (from the AMLmap compendium) have no risk group; they have WHO 2022 and ICC 2022
   classes and the AMLmap transcriptomic cluster instead.
 - **Age groups** follow the NCI bands: pediatric under 15, adolescent and young adult (AYA) 15–39,
   adult 40 and over, from age at diagnosis.
-- **MYC and mTOR RNA signatures**: a score per sample, the average of the signature genes after
-  standardizing each gene within the dataset; *high* = above the dataset's median. For cell lines the
-  published classification is used. For patients the score is recomputed and closely, but not exactly,
-  reproduces it (correlation 0.90 for MYC and 0.82 for mTOR on the cell lines).
+- **MYC and mTOR RNA signatures** (cell lines only): lines are MYC-high or mTOR-high following the published
+  classification. Patients are not given MYC / mTOR groups.
 - **Drugs** are matched across cohorts by name, ignoring salt forms and brackets, and annotated with their
   target genes from DepMap. Each cohort keeps its own measure: **AUC** (area under the dose–response
   curve; lower = more sensitive) or **DSS / sDSS** (drug sensitivity score; higher = more sensitive).
@@ -136,7 +135,7 @@ with tab_methods:
   test. The hazard ratio compares the first group with the second (above 1 = worse outcome in the first
   group). Each patient counts once, using the diagnosis sample when there is one. Overall survival is
   available for Beat AML (also used for its PTRC proteomics samples), the Zenodo proteogenomics cohort, the
-  FPM tumor board, TCGA and TARGET; event-free survival for the Zenodo cohort, the FPM tumor board and
+  FPM tumor board, TCGA, TARGET and both Jayavelu 2022 cohorts; event-free survival for the Zenodo cohort, the FPM tumor board and
   Wang 2022. Lee 2018 reports survival times without whether the patient died, so it is not included.
 - **Survival across cohorts** (Highlights): in each cohort, every gene's RNA level (or protein, or
   phosphosite) is related to survival with a Cox regression, one sample per patient. Each feature is
