@@ -317,3 +317,103 @@ def reference_tab() -> None:
         built = built.assign(method=built["method"].map(lambda m: METHOD_LABEL.get(m, m)),
                              level=built["level"].map(lambda lv: LEVEL_LABEL.get(lv, lv)))
         st.dataframe(built[["cohort", "method", "level"]], hide_index=True, width="stretch")
+
+
+# ------------------------------------------------------------------------------------------ differentiation stage tab
+DIFFSTAGE = "diffstage"                 # layer key (modality differentiation_score), from BoneMarrowMap
+
+
+def diffstage_cohorts() -> list[str]:
+    """Cohorts with BoneMarrowMap differentiation stage scores. Older data releases have none: the portal then
+    leaves the Differentiation stage tab out. A cohort whose values file is missing is skipped."""
+    root = data.patients_dir()
+    if not root:
+        return []
+    return [c for c in data.patient_cohorts()
+            if DIFFSTAGE in set(data.patient_datasets(c).get("key", []))
+            and (root / c / "values" / f"{DIFFSTAGE}.tsv.gz").is_file()]
+
+
+def diffstage_table(cohorts: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Scores (samples x stages, stage order kept) and the samples' annotation, pooled over cohorts."""
+    names = data.patient_cohort_names()
+    scores, samples = [], []
+    for c in cohorts:
+        V = data.patient_values(c, DIFFSTAGE)
+        try:
+            labels = data.patient_features(c, DIFFSTAGE)["label"]
+        except (FileNotFoundError, KeyError):          # no feature file: keep the stage IDs
+            labels = pd.Series(dtype=str)
+        scores.append(V.rename(index=labels).T.dropna(how="all"))
+        s = data.patient_samples_labeled(c).set_index("sample_id")
+        samples.append(s.loc[s.index.intersection(scores[-1].index)].assign(cohort=names.get(c, c)))
+    return pd.concat(scores), pd.concat(samples)
+
+
+def diffstage_tab() -> None:
+    cohorts = diffstage_cohorts()
+    if not cohorts:
+        st.info("No differentiation stage scores are available.")
+        return
+    names = data.patient_cohort_names()
+    st.markdown(
+        "How much each sample's RNA resembles 13 stages of normal blood cell development, from stem cells (HSC / MPP) "
+        "to mature cells. Scores come from **BoneMarrowMap** (Zeng et al. 2025, *Blood Cancer Discovery*), which "
+        "scored diagnosis samples of five cohorts against its single-cell atlas of normal bone marrow. Each score was "
+        "standardised across all five cohorts together, so 0 is the average sample and samples from different "
+        "cohorts can be compared directly. Unlike the proportions in *Composition*, a sample's scores do not add up "
+        "to anything.")
+    c1, c2 = st.columns([3, 2])
+    picked = c1.multiselect("Cohorts", cohorts, default=cohorts, format_func=lambda c: names.get(c, c), key="ds_cohorts")
+    if not picked:
+        st.info("Pick at least one cohort.")
+        return
+    S, A = diffstage_table(picked)
+    labels = {"cohort": "Cohort"}
+    for c in picked:
+        for col, r in data.patient_groupings(c).iterrows():
+            if col in A and A[col].notna().any():
+                labels.setdefault(col, r["label"])
+    opts = list(labels)
+    group_col = c2.selectbox("Group by", opts, format_func=labels.get, key="ds_group",
+                             index=opts.index("amlmap_cluster") if "amlmap_cluster" in opts else 0)
+    groups = A[group_col].astype("string").reindex(S.index)
+    counts = groups.value_counts()
+    keep = counts.index[counts >= 3]
+    S, groups = S[groups.isin(keep)], groups[groups.isin(keep)]
+    order = sorted(keep, key=str)
+    n_missing = int((A[group_col].reindex(A.index).isna()).sum())
+    st.caption(f"{len(S)} samples in {len(order)} groups (groups need at least 3 samples)"
+               + (f"; {n_missing} samples without this annotation are left out." if n_missing else "."))
+    if S.empty:
+        st.warning("No group has 3 or more samples.")
+        return
+
+    means = S.groupby(groups).mean().loc[order].T                      # stages x groups
+    lim = float(max(1.0, abs(means.values).max()))
+    fig = go.Figure(go.Heatmap(
+        z=means.values, x=[f"{g} (n={counts[g]})" for g in order], y=list(means.index), zmin=-lim, zmax=lim,
+        colorscale="RdBu_r", colorbar=dict(title="mean score"),
+        hovertemplate="%{y}<br>%{x}<br>mean score %{z:.2f}<extra></extra>"))
+    fig.update_layout(height=160 + 28 * len(means), margin=dict(t=10, b=10), yaxis=dict(autorange="reversed"),
+                      xaxis=dict(tickangle=-40))
+    st.subheader("Mean score per group")
+    st.caption("Red: the group resembles this stage more than the average sample; blue: less.")
+    st.plotly_chart(fig, width="stretch")
+
+    st.subheader("One stage by group")
+    stages = list(S.columns)
+    stage = st.selectbox("Stage", stages, index=stages.index("HSC / MPP") if "HSC / MPP" in stages else 0,
+                         key="ds_stage")
+    box = go.Figure()
+    for i, g in enumerate(order):
+        members = groups.index[groups == g]
+        box.add_trace(go.Box(y=S.loc[members, stage], name=f"{g} (n={len(members)})", boxpoints="all", jitter=0.4,
+                             pointpos=0, text=list(members), marker=dict(color=PALETTE[i % len(PALETTE)], size=4),
+                             hoverinfo="text+y"))
+    box.add_hline(y=0, line_dash="dot", line_color="grey")
+    box.update_layout(height=420, margin=dict(t=10, b=10), yaxis=dict(title=f"{stage} score"), showlegend=False,
+                      xaxis=dict(tickangle=-40))
+    st.plotly_chart(box, width="stretch")
+    st.download_button("Download scores (CSV)", S.join(A[list(dict.fromkeys(["cohort", group_col]))])
+                       .to_csv().encode(), "differentiation_stage_scores.csv", "text/csv", key="ds_download")

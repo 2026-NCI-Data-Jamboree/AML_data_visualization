@@ -356,7 +356,8 @@ def reference_provenance(reference: str) -> dict[str, str]:
     return dict(_read(results_dir() / "single_cell" / reference / "provenance.tsv", dtype=str).fillna("").values)
 
 
-LAYER_LABELS = {"expression": "RNA expression", "protein": "Protein", "phospho": "Phosphosite", "surface": "Surface protein"}
+LAYER_LABELS = {"expression": "RNA expression", "protein": "Protein", "phospho": "Phosphosite", "surface": "Surface protein",
+                "diffstage": "Differentiation stage score"}
 
 
 def layer_label(key: str) -> str:

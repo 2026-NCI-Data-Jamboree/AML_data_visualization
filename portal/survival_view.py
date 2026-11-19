@@ -103,7 +103,7 @@ def _groups(cohort: str, s: pd.DataFrame, key: str, kp: str) -> tuple[pd.Series,
         layer = c1.selectbox("Data type", layers, format_func=data.layer_label, key=f"{kp}_layer")
         sym = data.feature_names(cohort, layer)
         genes = sorted(sym.dropna().unique())
-        gene = c2.selectbox("Phosphosite" if layer == "phospho" else "Gene", genes, key=f"{kp}_gene",
+        gene = c2.selectbox("Phosphosite" if layer == "phospho" else "Stage" if layer == "diffstage" else "Gene", genes, key=f"{kp}_gene",
                             index=genes.index("PEAR1") if "PEAR1" in genes else 0)
         split = c3.selectbox("Split patients at", list(SPLITS), key=f"{kp}_split")
         V = data.patient_values(cohort, layer)

@@ -113,3 +113,41 @@ def test_hiding_removes_flagged_samples():
         at.toggle(key="dc_hide").set_value(hide).run()
         shown[hide] = int(next(c.value for c in at.caption if "samples shown" in c.value).split()[0])
     assert shown[False] - shown[True] == n_flagged
+
+
+DIFF_COHORTS = []
+if data.results_dir():
+    from portal.deconvolution import diffstage_cohorts, diffstage_table
+    DIFF_COHORTS = diffstage_cohorts()
+
+
+@pytest.mark.skipif(not DIFF_COHORTS, reason="no differentiation stage scores prepared")
+def test_differentiation_stage_scores():
+    S, A = diffstage_table(DIFF_COHORTS)
+    assert S.shape[1] == 13 and S.columns[0] == "HSC / MPP"
+    assert not S.index.duplicated().any() and set(S.index) == set(A.index)
+    # standardised across the five cohorts together: pooled mean about 0, SD about 1
+    assert S.mean().abs().max() < 0.05 and S.std().between(0.95, 1.05).all()
+    for c in DIFF_COHORTS:
+        assert data.patient_datasets(c).set_index("key").loc["diffstage", "modality"] == "differentiation_score"
+
+
+@pytest.mark.skipif(not DIFF_COHORTS, reason="no differentiation stage scores prepared")
+def test_differentiation_stage_tab_renders():
+    at = AppTest.from_file(PAGE, default_timeout=180).run()
+    assert not at.exception
+    assert not [e for e in at.error if "differentiation" in str(e.value)]
+    assert any("Mean score per group" in str(h.value) for h in at.subheader)
+
+
+def test_page_without_differentiation_stage_scores():
+    """Older data releases have no diffstage layer: the tab is left out and nothing breaks."""
+    script = f"""
+import portal.deconvolution as d
+d.diffstage_cohorts = lambda: []
+exec(open({PAGE!r}).read())
+"""
+    at = AppTest.from_string(script, default_timeout=180).run()
+    assert not at.exception
+    assert "Differentiation stage" not in [t.label for t in at.tabs]
+    assert not any("BoneMarrowMap" in str(m.value) for m in at.markdown)

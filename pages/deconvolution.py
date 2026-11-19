@@ -1,7 +1,7 @@
 import streamlit as st
 
 from portal import data
-from portal.deconvolution import composition_tab, reference_tab
+from portal.deconvolution import composition_tab, diffstage_cohorts, diffstage_tab, reference_tab
 
 
 def _safe(section: str, fn) -> None:
@@ -16,25 +16,35 @@ def _safe(section: str, fn) -> None:
 
 st.title("Deconvolution")
 st.caption("Built-in analysis 3")
-st.markdown(
-    "Estimated cell type and cell state composition of patient bulk RNA samples, from a single-cell reference of "
-    "AML bone marrow (AML scAtlas). The proportions are estimates, not measurements; see *About these estimates* below."
-)
-
 try:
     ready, refs = data.has_deconvolution(), bool(data.single_cell_references())
 except Exception:                                   # noqa: BLE001 - e.g. no results folder at all
     ready, refs = False, False
+try:                                                # differentiation stage scores: only in newer data releases
+    stages = bool(diffstage_cohorts())
+except Exception:                                   # noqa: BLE001
+    stages = False
+
+st.markdown(
+    "Estimated cell type and cell state composition of patient bulk RNA samples, from a single-cell reference of "
+    "AML bone marrow (AML scAtlas)"
+    + (", and differentiation stage scores of five cohorts from a single-cell atlas of normal bone marrow "
+       "(BoneMarrowMap). Both are" if stages else ". The proportions are")
+    + " estimates, not measurements; see *About these estimates* below."
+)
 if not ready:
     st.info("**Deconvolution results are not available yet.** They are produced by the deconvolution step of the "
             "processing pipeline (AML_data_processing) and appear here once that step has been run"
             + (". The single-cell reference can already be browsed in the *Reference* tab." if refs else
                ", together with the single-cell reference."), icon=":material/hourglass_empty:")
 
-tab_composition, tab_reference = st.tabs(["Composition", "Reference"])
-with tab_composition:
+tabs = st.tabs(["Composition"] + (["Differentiation stage"] if stages else []) + ["Reference"])
+with tabs[0]:
     _safe("composition", composition_tab)
-with tab_reference:
+if stages:                                          # the tab is left out when the data has no scores (older releases)
+    with tabs[1]:
+        _safe("differentiation stage scores", diffstage_tab)
+with tabs[-1]:
     _safe("reference", reference_tab)
 
 st.divider()
@@ -56,3 +66,7 @@ with the single-cell reference.
   share is likely underestimated in those cases.
 """
 )
+if stages:
+    st.markdown("- **Differentiation stage scores** (BoneMarrowMap) are a separate estimate: how much a sample resembles "
+                "each stage of normal blood cell development, standardised across five cohorts (0 = average sample). "
+                "They are not proportions.")
